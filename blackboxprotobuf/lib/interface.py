@@ -119,7 +119,8 @@ def validate_typedef(typedef, old_typedef=None):
         for field_number, value in old_typedef.items():
             wiretype_map[int(field_number)] = blackboxprotobuf.lib.types.type_maps.wiretypes[value['type']]
         for field_number, value in typedef.items():
-            old_wiretype = wiretype_map[int(field_number)]
-            if old_wiretype != blackboxprotobuf.lib.types.type_maps.wiretypes[value["type"]]:
-                raise ValueError("Wiretype for field number %s does not match old type definition"
-                                 % field_number)
+            if int(field_number) in wiretype_map:
+                old_wiretype = wiretype_map[int(field_number)]
+                if old_wiretype != blackboxprotobuf.lib.types.type_maps.wiretypes[value["type"]]:
+                    raise ValueError("Wiretype for field number %s does not match old type definition"
+                                     % field_number)
