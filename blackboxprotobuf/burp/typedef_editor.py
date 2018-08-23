@@ -15,6 +15,7 @@ class TypeEditorWindow(JFrame):
     def __init__(self, burp_callbacks, typedef, callback):
         self._burp_callbacks = burp_callbacks
         self._type_callback = callback
+        self.setSize(1000,700)
 
         self._original_typedef = typedef
         self._type_editor = burp_callbacks.createTextEditor()
