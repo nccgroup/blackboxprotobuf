@@ -167,12 +167,12 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         except Exception as exc:
             pass
 
-        try:
-            protobuf = base64.urlsafe_b64decode(payload)
-            self._encoder = 'base64_url'
-            return protobuf
-        except Exception as exc:
-            pass
+        #try:
+        #    protobuf = base64.urlsafe_b64decode(payload)
+        #    self._encoder = 'base64_url'
+        #    return protobuf
+        #except Exception as exc:
+        #    pass
 
         self._encoder = None
         return payload
