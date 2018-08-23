@@ -24,7 +24,7 @@ breakdown of the type system and possible type corner cases may be found at
 2. Download/Install Jython 2.7+ and configure Burp with the location. See
    <https://portswigger.net/burp/help/extender.html#options_pythonenv>.
 3. Clone this repository and then run `git submodule update --init` to install dependencies.
-4. Navigate to Extender -> Extensions and select "Add".
+4. Within Burp, navigate to Extender -> Extensions and select "Add".
 5. Set "Extension Type" to Python and select the `extender.py` file in the git repository.
 6. Click Next and the extension should load.
 
