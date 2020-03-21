@@ -13,7 +13,7 @@ def encode_uvarint(value):
 def decode_uvarint(buf, pos):
     """Decode bytearray into a long."""
     # Convert buffer to string
-    buf = buf.decode('latin')
+    #buf = buf.decode('latin')
     value, pos = decoder._DecodeVarint(buf, pos)
     return (value, pos)
 
@@ -30,7 +30,7 @@ def encode_varint(value):
 def decode_varint(buf, pos):
     """Decode bytearray into a long."""
     # Convert buffer to string
-    buf = buf.decode('latin')
+    #buf = buf.decode('latin')
     value, pos = decoder._DecodeSignedVarint(buf, pos)
     return (value, pos)
 

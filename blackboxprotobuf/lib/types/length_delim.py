@@ -28,6 +28,12 @@ def decode_bytes(value, pos):
     end = pos+length
     return value[pos:end], end
 
+def decode_str(value, pos):
+    """Decode varint for length and then the string"""
+    length, pos = varint.decode_varint(value, pos)
+    end = pos+length
+    return value[pos:end].decode('utf-8', 'backslashreplace'), end
+
 
 def encode_message(data, typedef, group=False):
     """Encode a Python dictionary representing a protobuf message
