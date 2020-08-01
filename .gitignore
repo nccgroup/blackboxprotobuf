@@ -1,2 +1,6 @@
 *.class
 TODO
+*.egg-info
+dist
+test*.py
+*.pyc

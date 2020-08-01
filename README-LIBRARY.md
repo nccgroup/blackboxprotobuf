@@ -1,13 +1,15 @@
 # BlackBox Protobuf Library
 
+### _Note: This is a fork of the library found [here](https://github.com/nccgroup/blackboxprotobuf). This original was written for adding protobuf reading to burp, this version strips out all burp related code and dependencies, and works with python3._
+
 ## Description
 Blackbox protobuf library is a Python module for decoding and re-encoding protobuf
 messages without access to the source protobuf descriptor file. This library
 provides a simple Python interface to encode/decode messages that can be
 integrated into other tools.
 
-This library is targeted towards use in penetration testing where being able to
-modify messages is critical and a protocol buffer definition may not be readily
+This library is targeted towards use in DFIR investigations where being able to
+read the content messages is critical and a protocol buffer definition may not be readily
 available.
 
 ## Background
@@ -45,12 +47,9 @@ improve user friendliness.
 
 # Usage
 ## Installation    
-This library depends on internal functions of Google's protobuf Python library
-to do some encoding/decoding of individual fields. This dependency is included
-in `lib-requirements.txt` and can be installed with:
 
 ```
-pip install -r lib-requirements.txt
+pip install blackboxprotobuf
 ```
 
 ## Interface
@@ -78,6 +77,7 @@ import base64
 data = base64.b64decode('KglNb2RpZnkgTWU=')
 message,typedef = blackboxprotobuf.protobuf_to_json(data)
 print(message)
+print(typedef)
 ```
 
 ### Encode
@@ -94,10 +94,11 @@ import base64
 data = base64.b64decode('KglNb2RpZnkgTWU=')
 message,typedef = blackboxprotobuf.decode_message(data)
 
-message[5] = 'Modified Me'
+message['5'] = 'Modified Me'
 
-data = blackboxprotobuf.encode_message(message,typedef)
+new_data = bytes(blackboxprotobuf.encode_message(message,typedef))
 print(data)
+print(new_data)
 ```
 
 ### Type definition structure
