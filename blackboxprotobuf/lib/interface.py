@@ -6,6 +6,48 @@ import blackboxprotobuf.lib.types.type_maps
 
 known_messages = {}
 
+def bytes_to_string(obj):
+    return obj.decode('utf8', 'backslashreplace')
+    
+def _get_json_writeable_obj(in_obj, out_obj, bytes_as_hex=False):
+    """Converts non-string values (like bytes) to strings
+    in lists/dictionaries recursively.
+    """
+    if isinstance(in_obj, list):
+        for item in in_obj:
+            if isinstance(item, list):
+                i = []
+                out_obj.append(i)
+                _get_json_writeable_obj(item, i, bytes_as_hex)
+            elif isinstance(item, dict):
+                i = {}
+                out_obj.append(i)
+                _get_json_writeable_obj(item, i, bytes_as_hex)
+            elif isinstance(item, bytes):
+                if bytes_as_hex:
+                    out_obj.append(item.hex())
+                else:
+                    out_obj.append(bytes_to_string(item))
+            else:
+                out_obj.append(str(item))
+    else: #dict
+        for k, v in in_obj.items():
+            if isinstance(v, list):
+                i = []
+                out_obj[k] = i
+                _get_json_writeable_obj(v, i, bytes_as_hex)
+            elif isinstance(v, dict):
+                i = {}
+                out_obj[k] = i
+                _get_json_writeable_obj(v, i, bytes_as_hex)
+            elif isinstance(v, bytes):
+                if bytes_as_hex:
+                    out_obj[k] = v.hex()
+                else:
+                    out_obj[k] = bytes_to_string(v)
+            else:
+                out_obj[k] = str(v)
+
 def decode_message(buf, message_type=None):
     """Decode a message to a Python dictionary.
     Returns tuple of (values, types)
@@ -27,12 +69,13 @@ def encode_message(value, message_type):
     """
     return blackboxprotobuf.lib.types.length_delim.encode_message(value, message_type)
 
-def protobuf_to_json(*args, **kwargs):
+def protobuf_to_json(buf, message_type=None, bytes_as_hex=False):
     """Encode to python dictionary and dump to JSON.
-    Takes same arguments as decode_message
     """
-    value, message_type = decode_message(*args, **kwargs)
-    return json.dumps(value, indent=2, encoding='latin1'), message_type
+    value, message_type = decode_message(buf, message_type)
+    value_cleaned = {}
+    _get_json_writeable_obj(value, value_cleaned, bytes_as_hex)
+    return json.dumps(value_cleaned, indent=2, ensure_ascii=False), message_type
 
 def protobuf_from_json(value, *args, **kwargs):
     """Decode JSON string to JSON and then to protobuf.
