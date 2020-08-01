@@ -3,13 +3,13 @@ import pathlib
 
 here = pathlib.Path(__file__).parent.resolve()
 
-long_description = (here / 'README-LIBRARY.md').read_text(encoding='utf-8')
-req = (here / 'lib-requirements.txt').read_text(encoding='utf-8').splitlines()
+long_description = (here / 'README.md').read_text(encoding='utf-8')
+req = (here / 'requirements.txt').read_text(encoding='utf-8').splitlines()
 req = [x.strip() for x in req if x.strip()]
 
 setuptools.setup(
     name="blackboxprotobuf",
-    version="1.0.0",
+    version="1.0.1",
     author="Yogesh Khatri",
     author_email="yogesh@swiftforensics.com",
     description="Library for reading protobuf buffers without .proto definitions",
