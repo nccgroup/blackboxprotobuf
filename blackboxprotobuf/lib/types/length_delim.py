@@ -18,7 +18,10 @@ def decode_guess(buf, pos):
 
 def encode_bytes(value):
     """Encode varint length followed by the string"""
-    value = bytearray(value, 'utf-8')
+    if isinstance(value, str):
+        value = bytearray(value, 'utf-8')
+    else:
+        value = bytearray(value)
     encoded_length = varint.encode_varint(len(value))
     return encoded_length + value
 
@@ -46,7 +49,7 @@ def encode_message(data, typedef, group=False):
     for field_number, value in data.items():
         # Get the field number convert it as necessary
         alt_field_number = None
-        if isinstance(field_number, (unicode, str)):
+        if isinstance(field_number, str):
             if '-' in field_number:
                 field_number, alt_field_number = field_number.split('-')
             for number, info in typedef.items():
@@ -122,7 +125,7 @@ def encode_message(data, typedef, group=False):
                 output += tag
                 output += field_encoder(value)
         except Exception as exc:
-            raise (ValueError,
+            raise ValueError(
                    'Error attempting to encode "%s" as %s: %s'
                    % (value, field_type, exc), sys.exc_info()[2])
 
