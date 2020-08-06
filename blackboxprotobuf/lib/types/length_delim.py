@@ -145,6 +145,8 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False):
                    'Could not read valid tag at pos %d. Ensure it is a valid protobuf message: %s'
                    % (pos-len(tag), exc), sys.exc_info()[2])
 
+        if wire_type not in blackboxprotobuf.lib.types.wire_type_defaults:
+            raise ValueError('%d is not a valid wire type at pos %d.' % (wire_type, pos))
         # Convert to str
         field_number = str(field_number)
         orig_field_number = field_number
@@ -321,6 +323,6 @@ def generate_packed_decoder(wrapped_decoder):
             value, pos = wrapped_decoder(buf, pos)
             output.append(value)
         if pos > end:
-            raise decoder._DecodeError("Invalid Packed Field Length")
+            raise decoder._DecodeError("Invalid Packed Field Length. pos = %d, end = %d" %(pos,end))
         return output, pos
     return length_wrapper

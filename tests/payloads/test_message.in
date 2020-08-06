@@ -1,0 +1,21 @@
+testDouble: 4.55
+testFloat: 3.14
+testInt32: 5
+testInt64: 2
+testUInt32: 9
+testUInt64: 1024
+testSInt32: -2
+testSInt64: -1
+testFixed32: 20
+testFixed64: 10
+testSFixed32: -20
+testSFixed64: -34
+testBool: 1
+testString: "Test\n String"
+testBytes: "bytes\0aaa"
+testEmbed: {
+    embedDouble: 2.1
+    embedString: "Test1234"
+}
+testRepeatedInt32: 2
+testRepeatedInt32: 5

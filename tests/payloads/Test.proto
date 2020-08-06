@@ -1,0 +1,27 @@
+syntax = "proto3";
+// Set up a protobuf message that contains every possible type
+
+message TestMessage {
+    double testDouble = 1;
+    float testFloat = 2;
+    int32 testInt32 = 4;
+    int64 testInt64 = 8;
+    uint32 testUInt32 = 16;
+    uint64 testUInt64 = 32;
+    sint32 testSInt32 = 64;
+    sint64 testSInt64 = 128;
+    fixed32 testFixed32 = 256;
+    fixed64 testFixed64 = 512;
+    sfixed32 testSFixed32 = 1024;
+    sfixed64 testSFixed64 = 2048;
+    bool testBool = 4096;
+    string testString = 8192;
+    bytes testBytes = 16384;
+    EmbeddedMessage testEmbed = 32768;
+    repeated int32 testRepeatedInt32 = 65536;
+}
+
+message EmbeddedMessage {
+    double embedDouble = 3;
+    string embedString = 2;
+}
