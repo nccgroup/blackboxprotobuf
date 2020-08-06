@@ -40,7 +40,14 @@ def encode_message(data, typedef, group=False):
     for field_number, value in data.items():
         # Get the field number convert it as necessary
         alt_field_number = None
-        if isinstance(field_number, str):
+
+        if six.PY2:
+            string_types = (str, unicode)
+        else:
+            string_types = str
+
+        if isinstance(field_number, string_types):
+            print("Checking if %s in typdef" % field_number)
             if '-' in field_number:
                 field_number, alt_field_number = field_number.split('-')
             for number, info in typedef.items():
