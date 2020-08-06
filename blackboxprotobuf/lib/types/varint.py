@@ -3,9 +3,6 @@ from google.protobuf.internal import wire_format, encoder, decoder
 
 def encode_uvarint(value):
     """Encode a long or int into a bytearray."""
-    if not isinstance(value, (int, long)):
-        raise TypeError("UVarInt encode requires a long or int type")
-
     output = bytearray()
     encoder._EncodeVarint(output.append, value)
     return output
@@ -20,9 +17,6 @@ def decode_uvarint(buf, pos):
 
 def encode_varint(value):
     """Encode a long or int into a bytearray."""
-    if not isinstance(value, (int, long)):
-        raise TypeError("VarInt encode requires a long or int type")
-
     output = bytearray()
     encoder._EncodeSignedVarint(output.append, value)
     return output

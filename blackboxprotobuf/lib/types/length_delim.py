@@ -18,7 +18,8 @@ def decode_guess(buf, pos):
 
 def encode_bytes(value):
     """Encode varint length followed by the string"""
-    value = bytearray(value, 'utf-8')
+    if isinstance(value, unicode):
+        value = bytearray(value, 'utf-8')
     encoded_length = varint.encode_varint(len(value))
     return encoded_length + value
 
@@ -44,7 +45,7 @@ def encode_message(data, typedef, group=False):
             if '-' in field_number:
                 field_number, alt_field_number = field_number.split('-')
             for number, info in typedef.items():
-                if info['name'] == field_number and field_number != '':
+                if 'name' in info and info['name'] == field_number and field_number != '':
                     field_number = number
                     break
         else:
