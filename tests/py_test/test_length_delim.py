@@ -1,6 +1,7 @@
 from hypothesis import given
 import hypothesis.strategies as st
 import strategies
+import six
 
 from blackboxprotobuf.lib.types import length_delim 
 from blackboxprotobuf.lib.types import type_maps
@@ -13,18 +14,11 @@ def test_bytes_inverse(x):
     assert pos == len(encoded)
     assert decoded == x
 
-@given(x=strategies.input_map['bytes_unicode'])
-def test_bytes_unicode_inverse(x):
-    encoded = length_delim.encode_bytes(x)
-    decoded,pos = length_delim.decode_bytes(encoded,0)
-    assert pos == len(encoded)
-    assert decoded == bytearray(x, 'utf-8')
-
 @given(x=strategies.gen_message())
 def test_message_inverse(x):
     type_def, message = x
     # TODO: Type is weird here, need to reconcile the return type to expected input on decode
-    encoded = str(length_delim.encode_message(message, type_def))
+    encoded = length_delim.encode_message(message, type_def)
     decoded, _, pos = length_delim.decode_message(encoded, type_def, 0)
     assert pos == len(encoded)
     assert message == decoded

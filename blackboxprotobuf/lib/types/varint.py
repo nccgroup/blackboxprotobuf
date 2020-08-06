@@ -1,16 +1,28 @@
 """Classes for encoding and decoding varint types"""
 from google.protobuf.internal import wire_format, encoder, decoder
+import six
+
+def gen_append_bytearray(arr):
+    def append_bytearray(x):
+        if isinstance(x, (str,int)):
+            arr.append(x)
+        elif isinstance(x, bytes):
+            arr.extend(x)
+        else:
+            raise Exception("Unknown type returned by protobuf library")
+    return append_bytearray
 
 def encode_uvarint(value):
     """Encode a long or int into a bytearray."""
     output = bytearray()
-    encoder._EncodeVarint(output.append, value)
+    encoder._EncodeVarint(gen_append_bytearray(output), value)
     return output
 
 def decode_uvarint(buf, pos):
     """Decode bytearray into a long."""
     # Convert buffer to string
-    buf = buf.decode('latin')
+    if six.PY2:
+        buf = str(buf)
     value, pos = decoder._DecodeVarint(buf, pos)
     return (value, pos)
 
@@ -18,13 +30,14 @@ def decode_uvarint(buf, pos):
 def encode_varint(value):
     """Encode a long or int into a bytearray."""
     output = bytearray()
-    encoder._EncodeSignedVarint(output.append, value)
+    encoder._EncodeSignedVarint(gen_append_bytearray(output), value)
     return output
 
 def decode_varint(buf, pos):
     """Decode bytearray into a long."""
     # Convert buffer to string
-    buf = buf.decode('latin')
+    if six.PY2:
+        buf = str(buf)
     value, pos = decoder._DecodeSignedVarint(buf, pos)
     return (value, pos)
 

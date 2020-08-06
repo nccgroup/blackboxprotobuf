@@ -1,6 +1,7 @@
 """Module for encoding and decoding length delimited fields"""
 import copy
 import sys
+import six
 
 from google.protobuf.internal import wire_format, encoder, decoder
 
@@ -15,13 +16,11 @@ def decode_guess(buf, pos):
     except Exception as exc:
         return decode_bytes(buf, pos), 'bytes'
 
-
 def encode_bytes(value):
     """Encode varint length followed by the string"""
-    if isinstance(value, unicode):
-        value = bytearray(value, 'utf-8')
+
     encoded_length = varint.encode_varint(len(value))
-    return encoded_length + value
+    return encoded_length + six.ensure_binary(value)
 
 def decode_bytes(value, pos):
     """Decode varint for length and then the bytes"""
@@ -41,7 +40,7 @@ def encode_message(data, typedef, group=False):
     for field_number, value in data.items():
         # Get the field number convert it as necessary
         alt_field_number = None
-        if isinstance(field_number, (unicode, str)):
+        if isinstance(field_number, str):
             if '-' in field_number:
                 field_number, alt_field_number = field_number.split('-')
             for number, info in typedef.items():
@@ -138,7 +137,10 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False):
 
     while pos < end:
         # Read in a field
-        tag, pos = decoder._DecodeVarint(buf, pos)
+        if six.PY2:
+            tag, pos = decoder._DecodeVarint(str(buf), pos)
+        else:
+            tag, pos = decoder._DecodeVarint(buf, pos)
         try:
             field_number, wire_type = wire_format.UnpackTag(tag)
         except Exception as exc:

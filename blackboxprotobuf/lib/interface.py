@@ -3,6 +3,7 @@
 import json
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
+import six
 
 known_messages = {}
 
@@ -11,6 +12,7 @@ def decode_message(buf, message_type=None):
     Returns tuple of (values, types)
     """
 
+    buf = six.ensure_binary(buf)
     if message_type is None or isinstance(message_type, str):
         if message_type not in known_messages:
             message_type = {}

@@ -3,6 +3,7 @@ import hypothesis.strategies as st
 import hypothesis
 import strategies
 import json
+import six
 
 import blackboxprotobuf
 
@@ -54,7 +55,7 @@ def test_decode(x):
 # Test encoding with blackboxprotobuf
 @given(x=strategies.gen_message_data(testMessage_typedef))
 def test_encode(x):
-    encoded = str(blackboxprotobuf.encode_message(x, testMessage_typedef))
+    encoded = blackboxprotobuf.encode_message(x, testMessage_typedef)
     message = Test_pb2.TestMessage()
     message.ParseFromString(encoded)
 
@@ -63,7 +64,7 @@ def test_encode(x):
 
 # Try to modify a random key with blackbox and re-encode
 # TODO: In the future do more random modifications, like swap the whole value
-@given(x=strategies.gen_message_data(testMessage_typedef), modify_num=st.sampled_from(testMessage_typedef.keys()))
+@given(x=strategies.gen_message_data(testMessage_typedef), modify_num=st.sampled_from(sorted(testMessage_typedef.keys())))
 def test_modify(x, modify_num):
     modify_key = testMessage_typedef[modify_num]["name"]
     message = Test_pb2.TestMessage()
@@ -77,19 +78,20 @@ def test_modify(x, modify_num):
 
     if isinstance(decoded[modify_key], str):
         mod_func = lambda x: "test"
-    elif isinstance(decoded[modify_key], int):
-        mod_func = lambda x: 10
-    elif isinstance(decoded[modify_key], long):
+    if isinstance(decoded[modify_key], bytes):
+        mod_func = lambda x: b'test'
+    elif isinstance(decoded[modify_key], six.integer_types):
         mod_func = lambda x: 10
     elif isinstance(decoded[modify_key], float):
         mod_func = lambda x: 10
     else:
         hypothesis.note("Failed to modify key: %s (%r)" % (modify_key,type(decoded[modify_key]) ))
         assert False
+
     decoded[modify_key] = mod_func(decoded[modify_key])
     x[modify_key] = mod_func(x[modify_key])
 
-    encoded = str(blackboxprotobuf.encode_message(decoded, testMessage_typedef))
+    encoded = blackboxprotobuf.encode_message(decoded, testMessage_typedef)
     message = Test_pb2.TestMessage()
     message.ParseFromString(encoded)
 

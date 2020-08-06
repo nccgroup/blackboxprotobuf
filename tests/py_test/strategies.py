@@ -56,7 +56,6 @@ input_map = {
     'int': st.integers(min_value=-(2**63), max_value=2**63),
     'sint': st.integers(min_value=-(2**63), max_value=2**63),
     'bytes':  st.binary(),
-    'bytes_unicode':  st.characters(),
     'message':  gen_message(),
     'group': None
 }
