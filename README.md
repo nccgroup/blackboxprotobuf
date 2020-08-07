@@ -81,6 +81,8 @@ below.
       definition ('`message_typedef`') or labeled type name
       ('`message_type_name`')
     - `string` - Similar to bytes, but will return a string python type
+    - `bytes_hex` - Output binary data as a string of hex characters rather
+      than an escaped string
     - `packed_*` - Repeated fields of the same type packed into a buffer. Can
       be combined with any Varint, or fixed wiretype (eg. `packed_fixed32`)
 * Group (Start/End)
