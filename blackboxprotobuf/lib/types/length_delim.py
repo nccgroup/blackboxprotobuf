@@ -17,16 +17,26 @@ def decode_guess(buf, pos):
         return decode_bytes(buf, pos), 'bytes'
 
 def encode_bytes(value):
-    """Encode varint length followed by the string"""
-
+    """Encode varint length followed by the string.
+       This should also work to encode incoming string values.
+    """
+    value = six.ensure_binary(value)
     encoded_length = varint.encode_varint(len(value))
-    return encoded_length + six.ensure_binary(value)
+    return encoded_length + value
 
 def decode_bytes(value, pos):
     """Decode varint for length and then the bytes"""
+
     length, pos = varint.decode_varint(value, pos)
     end = pos+length
     return value[pos:end], end
+
+def decode_string(value, pos):
+    """Decode varint for length and then the bytes"""
+
+    length, pos = varint.decode_varint(value, pos)
+    end = pos+length
+    return value[pos:end].decode('utf-8', 'backslashreplace'), end
 
 
 def encode_message(data, typedef, group=False):

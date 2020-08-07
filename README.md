@@ -80,6 +80,7 @@ below.
     - `message` - (detected) Protobuf message. Can contain a nested type
       definition ('`message_typedef`') or labeled type name
       ('`message_type_name`')
+    - `string` - Similar to bytes, but will return a string python type
     - `packed_*` - Repeated fields of the same type packed into a buffer. Can
       be combined with any Varint, or fixed wiretype (eg. `packed_fixed32`)
 * Group (Start/End)

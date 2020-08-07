@@ -30,7 +30,7 @@ testMessage_typedef = {
     "1024": {"type": "sfixed32", "name": "testSFixed32"},
     "2048": {"type": "sfixed64", "name": "testSFixed64"},
     #"4096": {"type": "int", "name": "testBool"},
-    #"8192": {"type": "bytes", "name": "testString"},
+    "8192": {"type": "string", "name": "testString"},
     "16384": {"type": "bytes", "name": "testBytes"},
     #"32768": {"type": "message", "name": "testEmbed",
     #          "message_typedef": {
@@ -78,7 +78,9 @@ def test_modify(x, modify_num):
 
     if isinstance(decoded[modify_key], str):
         mod_func = lambda x: "test"
-    if isinstance(decoded[modify_key], bytes):
+    elif six.PY2 and isinstance(decoded[modify_key], unicode):
+        mod_func = lambda x: six.u("test")
+    elif isinstance(decoded[modify_key], bytes):
         mod_func = lambda x: b'test'
     elif isinstance(decoded[modify_key], six.integer_types):
         mod_func = lambda x: 10
