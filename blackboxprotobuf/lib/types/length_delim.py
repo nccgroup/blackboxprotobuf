@@ -47,7 +47,6 @@ def encode_message(data, typedef, group=False):
             string_types = str
 
         if isinstance(field_number, string_types):
-            print("Checking if %s in typdef" % field_number)
             if '-' in field_number:
                 field_number, alt_field_number = field_number.split('-')
             for number, info in typedef.items():
