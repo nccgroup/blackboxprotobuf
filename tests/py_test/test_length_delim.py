@@ -2,9 +2,15 @@ from hypothesis import given
 import hypothesis.strategies as st
 import strategies
 import six
+import binascii
 
 from blackboxprotobuf.lib.types import length_delim 
 from blackboxprotobuf.lib.types import type_maps
+
+if six.PY2:
+    string_types = (unicode,str)
+else:
+    string_types = str
 
 # Inverse checks. Ensure a value encoded by bbp decodes to the same value
 @given(x=strategies.input_map['bytes'])
@@ -16,15 +22,20 @@ def test_bytes_inverse(x):
     assert pos == len(encoded)
     assert decoded == x
 
+@given(x=strategies.input_map['bytes'].map(binascii.hexlify))
+def test_bytes_hex_inverse(x):
+    encoded = length_delim.encode_bytes_hex(x)
+    decoded, pos = length_delim.decode_bytes_hex(encoded,0)
+    assert isinstance(encoded, bytearray)
+    assert isinstance(decoded, (bytearray,bytes))
+    assert pos == len(encoded)
+    assert decoded == x
+
 @given(x=strategies.input_map['string'])
 def test_string_inverse(x):
     encoded = length_delim.encode_bytes(x)
     decoded,pos = length_delim.decode_string(encoded,0)
     assert isinstance(encoded, bytearray)
-    if six.PY2:
-        string_types = (unicode,str)
-    else:
-        string_types = str
     assert isinstance(decoded, string_types)
     assert pos == len(encoded)
     assert decoded == x

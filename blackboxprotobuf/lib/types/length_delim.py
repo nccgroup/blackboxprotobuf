@@ -2,6 +2,7 @@
 import copy
 import sys
 import six
+import binascii
 
 from google.protobuf.internal import wire_format, encoder, decoder
 
@@ -25,15 +26,26 @@ def encode_bytes(value):
     return encoded_length + value
 
 def decode_bytes(value, pos):
-    """Decode varint for length and then the bytes"""
-
+    """Decode varint for the length and then returns that number of bytes"""
     length, pos = varint.decode_varint(value, pos)
     end = pos+length
     return value[pos:end], end
 
+def encode_bytes_hex(value):
+    """Encode varint length followed by the string.
+       Expects a string of hex characters
+    """
+    return encode_bytes(binascii.unhexlify(value))
+
+def decode_bytes_hex(buf, pos):
+    """Decode varint for length and then returns that number of bytes.
+       Outputs the bytes as a hex value
+    """
+    value, pos = decode_bytes(buf, pos)
+    return binascii.hexlify(value), pos
+
 def decode_string(value, pos):
     """Decode varint for length and then the bytes"""
-
     length, pos = varint.decode_varint(value, pos)
     end = pos+length
     return value[pos:end].decode('utf-8', 'backslashreplace'), end
