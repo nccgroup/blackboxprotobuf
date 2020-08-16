@@ -149,7 +149,9 @@ Length delimited wire types are prefixed with a `varint` indicating the length.
 This is used for strings, bytestrings, inner messages and packed repeated
 fields. Messages can generally be identified by validating if it is a valid
 protobuf binary. If it is not a message, the default type is a string/byte
-which are relatively interchangeable in Python.
+which are relatively interchangeable in Python. A different default type (such
+as `bytes_hex` can be specified by changing
+`blackboxprotobuf.lib.types.default_binary_type`.
 
 Packed repeated fields are arrays of either `varints` or a fixed length wire
 type. Non-packed repeated fields use a separate tag (wire type + field number)

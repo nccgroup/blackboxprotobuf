@@ -4,6 +4,11 @@
 from google.protobuf.internal import wire_format
 from blackboxprotobuf.lib.types import varint, fixed, length_delim
 
+# Default decoder type when guessing non-message length-delimited values. Switch to
+# 'bytes_hex' or 'string' for alternate formats. Specifying a type in the type
+# definition will override this on a per-field basis.
+default_binary_type = 'bytes'
+
 encoders = {
     'uint': varint.encode_uvarint,
     'int': varint.encode_varint,

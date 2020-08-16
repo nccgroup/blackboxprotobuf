@@ -15,7 +15,10 @@ def decode_guess(buf, pos):
     try:
         return decode_lendelim_message(buf, {}, pos), 'message'
     except Exception as exc:
-        return decode_bytes(buf, pos), 'bytes'
+        default_type = blackboxprotobuf.lib.types.default_binary_type
+        if blackboxprotobuf.lib.types.wiretypes[default_type] != wire_format.WIRETYPE_LENGTH_DELIMITED:
+            raise ValueError('Incorrect \'default_type\' specified: %s' % default_type)
+        return blackboxprotobuf.lib.types.decoders[default_type](buf, pos), default_type
 
 def encode_bytes(value):
     """Encode varint length followed by the string.
