@@ -1,9 +1,9 @@
 """Methods for easy encoding and decoding of messages"""
 
 import json
+import six
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
-import six
 
 known_messages = {}
 
@@ -111,7 +111,7 @@ def validate_typedef(typedef, old_typedef=None):
                     #print(old_typedef.keys())
                     validate_typedef(value, old_typedef[field_number][key])
             if key == "alt_typedefs":
-                for alt_fieldnumber, alt_typedef in value.items():
+                for alt_field_number, alt_typedef in value.items():
                     #TODO validate alt_typedefs against old typedefs?
                     validate_typedef(alt_typedef)
 

@@ -4,7 +4,7 @@ import six
 
 def gen_append_bytearray(arr):
     def append_bytearray(x):
-        if isinstance(x, (str,int)):
+        if isinstance(x, (str, int)):
             arr.append(x)
         elif isinstance(x, bytes):
             arr.extend(x)

@@ -1,8 +1,8 @@
 """Module for encoding and decoding length delimited fields"""
+import binascii
 import copy
 import sys
 import six
-import binascii
 
 from google.protobuf.internal import wire_format, encoder, decoder
 
@@ -233,7 +233,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False, depth=0):
                     message_typedef = field_typedef['message_typedef']
                 # Check for type defined by message type name
                 elif 'message_type_name' in field_typedef:
-                    message_typedef = blackboxprotobuf.lib.types.messages[
+                    message_typedef = blackboxprotobuf.lib.known_messages[
                         field_typedef['message_type_name']]
 
                 try:
@@ -267,7 +267,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False, depth=0):
                     if 'alt_typedefs' in field_typedef:
                         # get the next higher alt field number
                         alt_field_number = str(
-                            max(map(int, field_tyepdef['alt_typedefs'].keys()))
+                            max(map(int, field_typedef['alt_typedefs'].keys()))
                             + 1)
                     else:
                         field_typedef['alt_typedefs'] = {}
@@ -280,7 +280,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False, depth=0):
                 # Check for a anonymous type
                 if 'group_typedef' in field_typedef:
                     group_typedef = field_typedef['group_typedef']
-                field_out, group_typedef, pos = decode_group(buf, group_typedef, pos, depth=group_depth)
+                field_out, group_typedef, pos = decode_group(buf, group_typedef, pos, depth=depth)
                 # Save type definition
                 field_typedef['group_typedef'] = group_typedef
             else:
@@ -344,7 +344,7 @@ def encode_group(value, typedef, field_number):
 
 def decode_group(buf, typedef=None, pos=0, end=None, depth=0):
     """Decode a protobuf group type"""
-    if typdef is None:
+    if typedef is None:
         depth = depth+1
     else:
         depth = 0
@@ -374,6 +374,6 @@ def generate_packed_decoder(wrapped_decoder):
             value, pos = wrapped_decoder(buf, pos)
             output.append(value)
         if pos > end:
-            raise decoder._DecodeError("Invalid Packed Field Length. pos = %d, end = %d" %(pos,end))
+            raise decoder._DecodeError("Invalid Packed Field Length. pos = %d, end = %d" % (pos, end))
         return output, pos
     return length_wrapper
