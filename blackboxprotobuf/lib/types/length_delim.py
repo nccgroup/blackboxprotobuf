@@ -9,11 +9,22 @@ from google.protobuf.internal import wire_format, encoder, decoder
 import blackboxprotobuf.lib.types
 from blackboxprotobuf.lib.types import varint
 
-def decode_guess(buf, pos):
+# Number of messages "deep" to keep guessing. Want to cap to prevent edge cases
+# where it attempts to parse a non-message binary as a message and it blows up
+# the python stack
+max_guess_recursion = 5
+
+def decode_guess(buf, pos, depth=0):
     """Try to decode as an empty message first, then just do as bytes
-       Returns the value + the type"""
+       Returns the value + the type
+       Max recursion should help with edge cases where it keeps guessing deeper
+       and deeper into the stack.
+    """
     try:
-        return decode_lendelim_message(buf, {}, pos), 'message'
+        if depth > max_guess_recursion:
+            # TODO: Need to make a better exception system
+            raise ValueError("Maximum guess recursion exceeded. current_depth: %d limit: %d" % (depth, max_guess_recursion))
+        return decode_lendelim_message(buf, {}, pos, depth=depth+1), 'message'
     except Exception as exc:
         default_type = blackboxprotobuf.lib.types.default_binary_type
         if blackboxprotobuf.lib.types.wiretypes[default_type] != wire_format.WIRETYPE_LENGTH_DELIMITED:
@@ -153,7 +164,7 @@ def encode_message(data, typedef, group=False):
 
     return output
 
-def decode_message(buf, typedef=None, pos=0, end=None, group=False):
+def decode_message(buf, typedef=None, pos=0, end=None, group=False, depth=0):
     """Decode a protobuf message with no length delimiter"""
     if end is None:
         end = len(buf)
@@ -199,7 +210,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False):
         field_out = None
         if field_type is None:
             if wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
-                out, field_type = decode_guess(buf, pos)
+                out, field_type = decode_guess(buf, pos, depth=depth)
                 if field_type == 'message':
                     field_out, message_typedef, pos = out
                     field_typedef['message_typedef'] = message_typedef
@@ -269,7 +280,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False):
                 # Check for a anonymous type
                 if 'group_typedef' in field_typedef:
                     group_typedef = field_typedef['group_typedef']
-                field_out, group_typedef, pos = decode_group(buf, group_typedef, pos)
+                field_out, group_typedef, pos = decode_group(buf, group_typedef, pos, depth=group_depth)
                 # Save type definition
                 field_typedef['group_typedef'] = group_typedef
             else:
@@ -315,10 +326,10 @@ def encode_lendelim_message(data, typedef):
     length = varint.encode_varint(len(message_out))
     return length + message_out
 
-def decode_lendelim_message(buf, typedef=None, pos=0):
+def decode_lendelim_message(buf, typedef=None, pos=0, depth=0):
     """Read in the length and use it as the end"""
     length, pos = varint.decode_varint(buf, pos)
-    ret = decode_message(buf, typedef, pos, pos+length)
+    ret = decode_message(buf, typedef, pos, pos+length, depth=depth)
     return ret
 
 # Not actually length delim, but we're hijacking the methods anyway
@@ -331,9 +342,15 @@ def encode_group(value, typedef, field_number):
     output.append(end_tag)
     return output
 
-def decode_group(buf, typedef=None, pos=0, end=None):
+def decode_group(buf, typedef=None, pos=0, end=None, depth=0):
     """Decode a protobuf group type"""
-    return decode_message(buf, typedef, pos, end, group=True)
+    if typdef is None:
+        depth = depth+1
+    else:
+        depth = 0
+    if depth > max_guess_recursion:
+        raise ValueError("Maximum guess recursion exceeded. current_depth: %d limit: %d" % (depth, max_guess_recursion))
+    return decode_message(buf, typedef, pos, end, group=True, depth=depth)
 
 def generate_packed_encoder(wrapped_encoder):
     """Generate an encoder for a packed type from the base type encoder"""
