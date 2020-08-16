@@ -1,4 +1,4 @@
-"""This module provides generic functions for encoding and decoding protobuf's
+"""This module provides generic functions for encoding and decoding protobufs
    to python dictionaries or JSON
 """
 from .interface import *
