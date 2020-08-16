@@ -10,15 +10,18 @@ settings.register_profile("extended", max_examples=1000, database=database.Examp
 settings.load_profile("quick")
 
 @st.composite
-def message_typedef_gen(draw):
+def message_typedef_gen(draw, max_depth=3):
     output = {}
-    field_numbers = draw(st.lists(st.integers(min_value=1, max_value=2000).map(str)))
+    field_numbers = draw(st.lists(st.integers(min_value=1, max_value=2000).map(str), min_size=1))
     for field_number in field_numbers:
+        message_types = [ field_type for field_type in type_maps.wiretypes.keys() if field_type in input_map and input_map[field_type] is not None ]
+        if max_depth == 0:
+            message_types.remove('message')
         field_type = draw(st.sampled_from(message_types))
         output[field_number] = {}
         output[field_number]['type'] = field_type
         if field_type == 'message':
-            output[field_number]['message_typedef'] = draw(message_typedef_gen())
+            output[field_number]['message_typedef'] = draw(message_typedef_gen(max_depth=max_depth-1))
     return output
 
 @st.composite
@@ -72,4 +75,3 @@ input_map.update({
     'packed_double': st.lists(input_map['double']),
 })
 
-message_types = [ wiretype for wiretype in type_maps.wiretypes.keys() if wiretype in input_map and input_map[wiretype] is not None ]
