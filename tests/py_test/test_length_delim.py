@@ -1,4 +1,4 @@
-from hypothesis import given
+from hypothesis import given,assume,note
 import hypothesis.strategies as st
 import strategies
 import six
@@ -17,6 +17,21 @@ else:
 def test_bytes_inverse(x):
     encoded = length_delim.encode_bytes(x)
     decoded,pos = length_delim.decode_bytes(encoded,0)
+    assert isinstance(encoded, bytearray)
+    assert isinstance(decoded, bytearray)
+    assert pos == len(encoded)
+    assert decoded == x
+
+# Inverse checks. Ensure a value encoded by bbp decodes to the same value
+@given(x=strategies.input_map['bytes'])
+def test_bytes_guess_inverse(x):
+    encoded = length_delim.encode_bytes(x)
+    value, decoded_type = length_delim.decode_guess(encoded,0)
+
+    # would like to fail if it guesses wrong, but sometimes it might parse as a message
+    assume(decoded_type == type_maps.default_binary_type)
+
+    decoded, pos = value
     assert isinstance(encoded, bytearray)
     assert isinstance(decoded, bytearray)
     assert pos == len(encoded)
@@ -43,13 +58,26 @@ def test_string_inverse(x):
 @given(x=strategies.gen_message())
 def test_message_inverse(x):
     type_def, message = x
-    # TODO: Type is weird here, need to reconcile the return type to expected input on decode
-    encoded = length_delim.encode_message(message, type_def)
-    decoded, _, pos = length_delim.decode_message(encoded, type_def, 0)
+    encoded = length_delim.encode_lendelim_message(message, type_def)
+    decoded, _, pos = length_delim.decode_lendelim_message(encoded, type_def, 0)
     assert isinstance(encoded, bytearray)
     assert isinstance(decoded, dict)
     assert pos == len(encoded)
     assert message == decoded
+
+@given(x=strategies.gen_message())
+def test_message_guess_inverse(x):
+    type_def, message = x
+
+    encoded = length_delim.encode_lendelim_message(message, type_def)
+    value, decoded_type = length_delim.decode_guess(encoded, 0)
+
+    assert decoded_type == 'message'
+    decoded, _, pos = value
+
+    assert isinstance(encoded, bytearray)
+    assert isinstance(decoded, dict)
+    assert pos == len(encoded)
 
 @given(x=strategies.input_map['packed_uint'])
 def test_packed_uint_inverse(x):
