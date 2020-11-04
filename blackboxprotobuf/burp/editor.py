@@ -4,6 +4,7 @@ import base64
 import zlib
 import burp
 import blackboxprotobuf
+import struct
 from javax.swing import JSplitPane, JPanel, JButton, BoxLayout, JOptionPane
 from java.awt import Component
 from java.awt.event import ActionListener
@@ -167,6 +168,13 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         except Exception as exc:
             pass
 
+        # try decoding as a gRPC payload: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+        # we're naiively handling only uncompressed payloads
+        if len(payload) > 1 + 4 and payload.startswith(bytearray([0x00])): # gRPC has 1 byte flag + 4 byte length
+            (message_length,) = struct.unpack_from(">I", payload[1:])
+            if len(payload) == 1 + 4 + message_length:
+                self._encoder = 'gRPC'
+                return payload[1 + 4:]
         #try:
         #    protobuf = base64.urlsafe_b64decode(payload)
         #    self._encoder = 'base64_url'
@@ -189,6 +197,9 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             gzip_compress = zlib.compressobj(-1, zlib.DEFLATED, -zlib.MAX_WBITS)
             self._encoder = 'gzip'
             return gzip_compress.compress(payload)
+        elif self._encoder == 'gRPC':
+            message_length = struct.pack(">I", len(payload))
+            return bytearray([0x00]) + bytearray(message_length) + payload
         else:
             return payload
 
@@ -219,7 +230,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         if info.getBodyOffset() == len(content):
             return False
 
-        protobuf_content_types = ['x-protobuf', 'application/protobuf']
+        protobuf_content_types = ['x-protobuf', 'application/protobuf', 'application/grpc']
         # Check all headers for x-protobuf
         for header in info.getHeaders():
             if 'content-type' in header.lower():
