@@ -1,15 +1,29 @@
 """ Functions for encoding and decoding fixed size structs """
 import struct
+import binascii
+import six
+from blackboxprotobuf.lib.exceptions import DecoderException, EncoderException
 
 # Generic functions for encoding/decoding structs based on the "struct" format
 def encode_struct(fmt, value):
     """Generic method for encoding arbitrary python "struct" values"""
-    return struct.pack(fmt, value)
+    try:
+        return struct.pack(fmt, value)
+    except struct.error as exc:
+        six.raise_from(
+            EncoderException("Error encoding value %r with format string %s" % (value, fmt)),
+            exc)
 
 def decode_struct(fmt, buf, pos):
     """Generic method for decoding arbitrary python "struct" values"""
     new_pos = pos + struct.calcsize(fmt)
-    return struct.unpack(fmt, buf[pos:new_pos])[0], new_pos
+    try:
+        return struct.unpack(fmt, buf[pos:new_pos])[0], new_pos
+    except struct.error as exc:
+        six.raise_from(
+            DecoderException("Error deocding format string %s from bytes: %s" % (
+                fmt, binascii.hexlify(buf[pos:new_pos]))),
+            exc)
 
 _fixed32_fmt = '<I'
 def encode_fixed32(value):

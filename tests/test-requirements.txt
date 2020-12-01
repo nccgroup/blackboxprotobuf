@@ -1,3 +1,4 @@
 pytest
 hypothesis
 attrs>=19.2
+pylint
