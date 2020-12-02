@@ -27,6 +27,7 @@ breakdown of the type system and possible type corner cases may be found at
 4. Within Burp, navigate to Extender -> Extensions and select "Add".
 5. Set "Extension Type" to Python and select the `extender.py` file in the git repository.
 6. Click Next and the extension should load.
+7. **Note:** [gRPC](https://grpc.io/about/) is supported, but you'll have to enable Burp's HTTP/2 support (under Project Options->HTTP). Also, currently only uncompressed gRPC payloads are supported. If the first byte of the payload is not `0x00`, it's compressed and you'll have to modify the en/decoding code to account for that.
 
 
 ## Editing Messages
