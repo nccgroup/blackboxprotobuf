@@ -1,7 +1,7 @@
 """Methods for easy encoding and decoding of messages"""
 
-import json
 import six
+import json
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 from blackboxprotobuf.lib.exceptions import TypedefException
@@ -13,6 +13,8 @@ def decode_message(buf, message_type=None):
     Returns tuple of (values, types)
     """
 
+    if isinstance(buf, bytearray):
+        buf = bytes(buf)
     buf = six.ensure_binary(buf)
     if message_type is None or isinstance(message_type, str):
         if message_type not in known_messages:
@@ -28,20 +30,23 @@ def encode_message(value, message_type):
     """Encodes a python dictionary to a message.
     Returns a bytearray
     """
-    return blackboxprotobuf.lib.types.length_delim.encode_message(value, message_type)
+    return bytes(blackboxprotobuf.lib.types.length_delim.encode_message(value, message_type))
 
 def protobuf_to_json(*args, **kwargs):
     """Encode to python dictionary and dump to JSON.
     Takes same arguments as decode_message
     """
     value, message_type = decode_message(*args, **kwargs)
-    return json.dumps(value, indent=2, encoding='latin1'), message_type
+    value = json_safe_transform(value, message_type, False)
+    return json.dumps(value, indent=2), message_type
 
-def protobuf_from_json(value, *args, **kwargs):
+def protobuf_from_json(json_str, message_type, *args, **kwargs):
     """Decode JSON string to JSON and then to protobuf.
     Takes same arguments as encode_message
     """
-    return encode_message(json.loads(value), *args, **kwargs)
+    value = json.loads(json_str)
+    value = json_safe_transform(value, message_type, True)
+    return encode_message(value, message_type, *args, **kwargs)
 
 def validate_typedef(typedef, old_typedef=None, path=None):
     """Validate the typedef format. Optionally validate wiretype of a field
@@ -133,3 +138,30 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                 if old_wiretype != blackboxprotobuf.lib.types.type_maps.wiretypes[value["type"]]:
                     raise TypedefException(("Wiretype for field number %s does"
                                             " not match old type definition") % field_number, field_path)
+def json_safe_transform(values, typedef, toBytes):
+    """ JSON doesn't handle bytes type well. We want to go through and encode
+    every bytes type as latin1 to get a semi readable text """
+
+    name_map = {item['name']: number for number, item in typedef.items() if item['name'] != ''}
+    for name, value in values.items():
+        alt_number = None
+        if '-' in name:
+            name, alt_number = name.split("-")
+        if name in name_map:
+            field_number = name_map[name]
+            field_type = typedef[field_number]['type']
+            if field_type == 'bytes':
+                if toBytes:
+                    values[name] = values[name].encode('latin1')
+                else:
+                    values[name] = values[name].decode('latin1')
+            elif field_type == 'message':
+                if alt_number is not None:
+                    if alt_number not in typedef[field_number]['alt_typedefs']:
+                        raise TypedefException(('Provided alt field name/number '
+                                               '%s is not valid for field_number %s')
+                                               % (alt_field_number, field_number))
+                    values[name] = json_safe_encoding(value, typedef[field_number]['alt_typedefs'][alt_number])
+                else:
+                    values[name] = json_safe_encoding(value, typdef[field_number]['message_typedef'])
+    return values

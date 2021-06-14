@@ -21,7 +21,7 @@ encoders = {
     'double': fixed.encode_double,
     'bytes': length_delim.encode_bytes,
     'bytes_hex': length_delim.encode_bytes_hex,
-    'string': length_delim.encode_bytes,
+    'string': length_delim.encode_string,
     'packed_uint': length_delim.generate_packed_encoder(varint.encode_uvarint),
     'packed_int': length_delim.generate_packed_encoder(varint.encode_varint),
     'packed_sint': length_delim.generate_packed_encoder(varint.encode_svarint),

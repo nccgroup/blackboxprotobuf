@@ -38,22 +38,40 @@ def decode_guess(buf, pos, depth=0, path=None):
         # This case is normal and expected, but if there is a field that we
         # care about and want to know why it isn't decoding, this could be
         # useful
+
         logging.debug(("Attempted to decode lengh delimited message at %s, but "
                        "failed to find a message, treating field as binary. "
                        "Exception:\n %r"), "->".join(map(str, path)),
                                              str(exc))
-        default_type = blackboxprotobuf.lib.types.default_binary_type
-        if (blackboxprotobuf.lib.types.wiretypes[default_type]
-                != wire_format.WIRETYPE_LENGTH_DELIMITED):
-            raise BlackboxProtobufException(
-                "Incorrect \'default_type\' specified in wiretypes.py: %s"
-                % default_type)
-        return blackboxprotobuf.lib.types.decoders[default_type](buf, pos), default_type
+    try:
+        # Try to encode the binary as a unicode string
+        return decode_string(buf, pos), 'string'
+    except DecoderException as exc:
+        logging.debug(("Attempted to decode lengh delimited message at %s as "
+                       "UTF-8, but could not successfuly decode the string"),
+                       "->".join(map(str, path)), str(exc))
+
+    default_type = blackboxprotobuf.lib.types.default_binary_type
+    if (blackboxprotobuf.lib.types.wiretypes[default_type]
+            != wire_format.WIRETYPE_LENGTH_DELIMITED):
+        raise BlackboxProtobufException(
+            "Incorrect \'default_type\' specified in wiretypes.py: %s"
+            % default_type)
+    return blackboxprotobuf.lib.types.decoders[default_type](buf, pos), default_type
+
+def encode_string(value):
+    try:
+        value = six.ensure_text(value)
+    except TypeError as exc:
+        six.raise_from(EncoderException("Error encoding string to message: %r" % value), exc)
+    return encode_bytes(value)
 
 def encode_bytes(value):
     """Encode varint length followed by the string.
        This should also work to encode incoming string values.
     """
+    if isinstance(value, bytearray):
+        value = bytes(value)
     try:
         value = six.ensure_binary(value)
     except TypeError as exc:
@@ -93,8 +111,9 @@ def decode_string(value, pos):
     length, pos = varint.decode_varint(value, pos)
     end = pos+length
     try:
-        return value[pos:end].decode('utf-8', 'backslashreplace'), end
-    except TypeError as exc:
+        # backslash escaping isn't reversible easily
+        return value[pos:end].decode('utf-8'), end
+    except (TypeError, UnicodeDecodeError) as exc:
         six.raise_from(DecoderException("Error decoding UTF-8 string %s" % value[pos:end]), exc)
 
 
@@ -121,6 +140,7 @@ def encode_message(data, typedef, group=False, path=None):
         if isinstance(field_number, string_types):
             if '-' in field_number:
                 field_number, alt_field_number = field_number.split('-')
+            # TODO can refactor to cache the name to number mapping
             for number, info in typedef.items():
                 if 'name' in info and info['name'] == field_number and field_number != '':
                     field_number = number
