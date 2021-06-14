@@ -379,12 +379,12 @@ def decode_message(buf, typedef=None, pos=0, end=None, group=False, depth=0, pat
         # Deal with repeats
         if field_key in output:
             if isinstance(field_out, list):
-                if isinstance(output[field_number], list):
+                if isinstance(output[field_key], list):
                     output[field_key] += field_out
                 else:
                     output[field_key] = field_out.append(output[field_key])
             else:
-                if isinstance(output[field_number], list):
+                if isinstance(output[field_key], list):
                     output[field_key].append(field_out)
                 else:
                     output[field_key] = [output[field_key], field_out]
