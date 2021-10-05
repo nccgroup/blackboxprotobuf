@@ -531,6 +531,9 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._type_list_component.clearSelection()
         self._new_type_field.setText("")
 
+    def open_typedef_window(self):
+        self._extension.open_typedef_editor(self.message_type, self.editType)
+
 
 class EditorButtonListener(ActionListener):
     """Callback listener for buttons in the message editor tab"""
@@ -545,12 +548,7 @@ class EditorButtonListener(ActionListener):
         elif event.getActionCommand() == "reset":
             self._editor_tab.resetMessage()
         elif event.getActionCommand() == "edit-type":
-            # TODO hook up something to kill this window when we unload
-            typedef_editor.TypeEditorWindow(
-                self._editor_tab._callbacks,
-                self._editor_tab.message_type,
-                self._editor_tab.editType,
-            ).show()
+            self._editor_tab.open_typedef_window()
         elif event.getActionCommand() == "new-type":
             self._editor_tab.saveAsNewType()
         elif event.getActionCommand() == "clear-type":

@@ -17,7 +17,7 @@ _BASE_DIR = os.path.abspath(
 sys.path.insert(0, _BASE_DIR + "/burp/")
 
 import blackboxprotobuf
-from blackboxprotobuf.burp import editor, typedef_tab
+from blackboxprotobuf.burp import editor, typedef_tab, typedef_editor
 
 
 EXTENSION_NAME = "BlackboxProtobuf"
@@ -27,6 +27,7 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
     """Primary extension class. Sets up all other functionality."""
 
     def __init__(self):
+        self.open_windows = []
         self.callbacks = None
         self.helpers = None
         self.saved_types = {}
@@ -73,6 +74,7 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
             self.saved_types.update(json.loads(saved_types))
 
     def saveKnownMessages(self):
+        # TODO might be good to cll this more often (eg. when messages are updated)
         # save the known messages
         self.callbacks.saveExtensionSetting(
             "known_messages", json.dumps(blackboxprotobuf.known_messages)
@@ -82,5 +84,18 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
         )
 
     def extensionUnloaded(self):
-        # TODO kill any open editor windows
         self.saveKnownMessages()
+        for window in self.open_windows:
+            window.exitTypeWindow()
+
+    def open_typedef_editor(self, message_type, callback):
+        self.open_windows = [window for window in self.open_windows if window.is_open]
+
+        window = typedef_editor.TypeEditorWindow(
+            self.callbacks,
+            message_type,
+            callback,
+        )
+        window.show()
+
+        self.open_windows.append(window)

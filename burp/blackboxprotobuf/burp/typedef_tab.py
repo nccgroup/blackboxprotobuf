@@ -114,13 +114,6 @@ class TypeDefinitionTab(burp.ITab):
         button.setToolTipText(tooltip)
         return button
 
-
-class TypeDefinitionButtonListener(ActionListener):
-    """Callback listener for buttons in the TypeDefinition interface"""
-
-    def __init__(self, typedef_tab):
-        self._typedef_tab = typedef_tab
-
     def create_save_callback(self, name):
         """Generate a callback for when the save button inside an opened type
         editor window is saved. Saves the type and tells the list to
@@ -130,44 +123,51 @@ class TypeDefinitionButtonListener(ActionListener):
         def save_callback(typedef):
             """Save typedef and update list for a given message name"""
             if name not in blackboxprotobuf.known_messages:
-                self._typedef_tab._extension.known_message_model.addElement(name)
+                self._extension.known_message_model.addElement(name)
 
             blackboxprotobuf.known_messages[name] = typedef
 
         return save_callback
 
+    def add_typedef(self):
+        type_name = JOptionPane.showInputDialog("Enter new name")
+
+        # Error out if already defined
+        if type_name in blackboxprotobuf.known_messages:
+            JOptionPane.showMessageDialog(
+                self._component,
+                'Message type "%s" already exists' % type_name,
+            )
+            return
+
+        self._extension.open_typedef_editor({}, self.create_save_callback(type_name))
+
+    def edit_typedef(self):
+        list_component = self._type_list_component
+        if list_component.isSelectionEmpty():
+            return
+
+        type_name = list_component.getSelectedValue()
+        message_type = blackboxprotobuf.known_messages[type_name]
+
+        self._extension.open_typedef_editor(
+            sort_typedef(message_type), self.create_save_callback(type_name)
+        )
+
+
+class TypeDefinitionButtonListener(ActionListener):
+    """Callback listener for buttons in the TypeDefinition interface"""
+
+    def __init__(self, typedef_tab):
+        self._typedef_tab = typedef_tab
+
     def actionPerformed(self, event):
         """Called when a button is pressed."""
         if event.getActionCommand() == "new-type":
-            type_name = JOptionPane.showInputDialog("Enter new name")
-
-            # Error out if already defined
-            if type_name in blackboxprotobuf.known_messages:
-                JOptionPane.showMessageDialog(
-                    self._typedef_tab._component,
-                    'Message type "%s" already exists' % type_name,
-                )
-                return
-
-            typedef_editor.TypeEditorWindow(
-                self._typedef_tab._burp_callbacks,
-                {},
-                self.create_save_callback(type_name),
-            ).show()
+            self._typedef_tab.add_typedef()
 
         elif event.getActionCommand() == "edit-type":
-            list_component = self._typedef_tab._type_list_component
-            # Check if something is selected
-            if list_component.isSelectionEmpty():
-                return
-
-            # Get's only the first value
-            type_name = list_component.getSelectedValue()
-            typedef_editor.TypeEditorWindow(
-                self._typedef_tab._burp_callbacks,
-                sort_typedef(blackboxprotobuf.known_messages[type_name]),
-                self.create_save_callback(type_name),
-            ).show()
+            self._typedef_tab.edit_typedef()
 
         elif event.getActionCommand() == "rename-type":
             list_component = self._typedef_tab._type_list_component

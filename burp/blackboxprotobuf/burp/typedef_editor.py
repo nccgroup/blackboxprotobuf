@@ -46,6 +46,8 @@ class TypeEditorWindow(JDialog):
 
         self.add(splitPane)
 
+        self.is_open = True
+
     def createButtonPane(self):
         """Create a new button pane with the type editor window"""
         self._button_listener = TypeEditorButtonListener(self)
@@ -97,6 +99,7 @@ class TypeEditorWindow(JDialog):
 
     def exitTypeWindow(self):
         """Callback for exit button. Exits the window without saving"""
+        self.is_open = False
         self.dispatchEvent(WindowEvent(self, WindowEvent.WINDOW_CLOSING))
 
     def validateType(self):
