@@ -47,6 +47,8 @@ class TypeDefinitionTab(burp.ITab):
         panel.add(self.createButton("Delete Type", "delete-type"))
         panel.add(self.createButton("Save All Types To File", "save-types"))
         panel.add(self.createButton("Load All Types To File", "load-types"))
+        panel.add(self.createButton("Export All types As .proto", "export-proto"))
+        panel.add(self.createButton("Import .proto", "import-proto"))
         return panel
 
     def createButton(self, text, command):
@@ -147,3 +149,28 @@ class TypeDefinitionButtonListener(ActionListener):
             for key, value in types.items():
                 blackboxprotobuf.known_messages[key] = value
             self._type_def_tab.updateList()
+        elif event.getActionCommand() == 'export-proto':
+            chooser = JFileChooser()
+            chooser.setFileFilter(FileNameExtensionFilter("Protobuf Type Definition", ["proto"]))
+            chooser.setMultiSelectionEnabled(False)
+
+            action = chooser.showSaveDialog(self._type_def_tab.getUiComponent())
+            if action == JFileChooser.CANCEL_OPTION or action == JFileChooser.ERROR_OPTION:
+                return
+
+            file_name = chooser.getSelectedFile().getCanonicalPath()
+            ext = os.path.splitext(file_name)[1]
+            if ext == '':
+                #No extension, add .proto
+                file_name += '.proto'
+
+            try:
+                print("Saving messages to %s" % file_name)
+                print("Known messages: %s" % blackboxprotobuf.known_messages)
+                blackboxprotobuf.export_protofile(blackboxprotobuf.known_messages, file_name)
+            except:
+                self._type_def_tab._burp_callbacks.printError(traceback.format_exc())
+                JOptionPane.showMessageDialog(self._component, "Error saving .proto file: " + str(exc))
+
+        elif event.getActionCommand() == 'import-proto':
+            pass
