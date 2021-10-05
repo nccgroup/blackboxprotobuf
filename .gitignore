@@ -1,2 +1,6 @@
 *.class
 TODO
+*.swp
+.vagrant
+__pycache__
+*.pyc
