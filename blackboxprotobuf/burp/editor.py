@@ -368,6 +368,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         if self._type_list_component.isSelectionEmpty():
             return
 
+        # TODO won't actually work right if we delete the type we're using a
+        # new type is now in the index
         if self._last_valid_type_index == self._type_list_component.getSelectedIndex():
             # hasn't actually changed since last time we tried
             # otherwise can trigger a second time when we call setSelectedIndex below on failure
