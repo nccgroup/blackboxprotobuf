@@ -16,15 +16,6 @@ from blackboxprotobuf.lib.exceptions import (
     BlackboxProtobufException,
 )
 
-# Turn on to get debug messages for binary field guessing
-# logging.basicConfig(level=logging.DEBUG)
-
-# Number of messages "deep" to keep guessing. Want to cap to prevent edge cases
-# where it attempts to parse a non-message binary as a message and it blows up
-# the python stack
-# TODO implement this for new decoder
-max_guess_recursion = 5
-
 
 def encode_string(value):
     try:
@@ -242,15 +233,20 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
     for (field_number, (wire_type, buffers)) in grouped_fields.items():
         # wire_type should already be validated by _group_by_number
 
+        path = path[:] + [field_number]
         field_outputs = None
         field_typedef = typedef.get(field_number, {})
-        field_key = _get_field_key(field_number, typedef)
+        field_key = _get_field_key(field_number, typedef, path)
         # Easy cases. Fixed size or bytes/string
-        if wire_type in [
-            wire_format.WIRETYPE_FIXED32,
-            wire_format.WIRETYPE_FIXED64,
-            wire_format.WIRETYPE_VARINT,
-        ] or ("type" in field_typedef and field_typedef["type"] != "message"):
+        if (
+            wire_type
+            in [
+                wire_format.WIRETYPE_FIXED32,
+                wire_format.WIRETYPE_FIXED64,
+                wire_format.WIRETYPE_VARINT,
+            ]
+            or ("type" in field_typedef and field_typedef["type"] != "message")
+        ):
 
             if "type" not in field_typedef:
                 field_typedef["type"] = blackboxprotobuf.lib.types.wire_type_defaults[
@@ -264,14 +260,16 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
                 ):
                     raise DecoderException(
                         "Type %s from typedef did not match wiretype %s for "
-                        "field %s" % (field_typedef["type"], wire_type, field_key)
+                        "field %s" % (field_typedef["type"], wire_type, field_key),
+                        path=path,
                     )
 
             # we already have a type, just map the decoder
             if field_typedef["type"] not in blackboxprotobuf.lib.types.decoders:
                 raise TypedefException(
                     "Got unkown type % for field_number %"
-                    % (field_typedef["type"], field_number)
+                    % (field_typedef["type"], field_number),
+                    path=path,
                 )
 
             decoder = blackboxprotobuf.lib.types.decoders[field_typedef["type"]]
@@ -305,7 +303,7 @@ def _group_by_number(buf, pos, end, path):
             "2": (<wiretype>, [<data>])
         }
     """
-    # TODO Add path to error messages in here
+
     output_map = {}
     while pos < end:
         # Read in a field
@@ -318,7 +316,8 @@ def _group_by_number(buf, pos, end, path):
             six.raise_from(
                 DecoderException(
                     "Error decoding length from buffer: %r..."
-                    % (binascii.hexlify(buf[pos : pos + 8]))
+                    % (binascii.hexlify(buf[pos : pos + 8])),
+                    path=path,
                 ),
                 exc,
             )
@@ -328,11 +327,14 @@ def _group_by_number(buf, pos, end, path):
         # We want field numbers as strings everywhere
         field_number = str(field_number)
 
+        path = path[:] + [field_number]
+
         if field_number in output_map and output_map[field_number][0] != wire_type:
             """This should never happen"""
             raise DecoderException(
                 "Field %s has mistmatched wiretypes. Previous: %s Now: %s"
-                % (field_number, output_map[field_number][0], wire_type)
+                % (field_number, output_map[field_number][0], wire_type),
+                path=path,
             )
 
         length = None
@@ -353,13 +355,14 @@ def _group_by_number(buf, pos, end, path):
             wire_format.WIRETYPE_START_GROUP,
             wire_format.WIRETYPE_END_GROUP,
         ]:
-            raise DecoderException("GROUP wire types not supported")
+            raise DecoderException("GROUP wire types not supported", path=path)
         else:
-            raise DecoderException("Got unkown wire type: %d" % wire_type)
+            raise DecoderException("Got unkown wire type: %d" % wire_type, path=path)
         if pos + length > end:
             raise DecoderException(
                 "Decoded length for field %s goes over end: %d > %d"
-                % (field_number, pos + length, end)
+                % (field_number, pos + length, end),
+                path=path,
             )
 
         field_buf = buf[pos : pos + length]
@@ -372,11 +375,11 @@ def _group_by_number(buf, pos, end, path):
     return output_map, pos
 
 
-def _get_field_key(field_number, typedef):
+def _get_field_key(field_number, typedef, path):
     """If field_number has a name, then use that"""
     if not isinstance(field_number, (int, str)):
         # Should only get unpredictable inputs from encoding
-        raise EncoderException("Field key in message must be a str or int")
+        raise EncoderException("Field key in message must be a str or int", path=path)
     if isinstance(field_number, int):
         field_number = str(field_number)
     alt_field_number = None
@@ -385,7 +388,8 @@ def _get_field_key(field_number, typedef):
         # TODO
         raise NotImplemented(
             "Handling for _get_field_key not implemented for alt typedefs: %"
-            % field_number
+            % field_numbe,
+            path=path,
         )
     if field_number in typedef and "name" in typedef[field_number]:
         field_key = typedef[field_number]["name"]
