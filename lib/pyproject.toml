@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "blackboxprotobuf"
+version = "0.1.0"
+description = "Library for working with protobuf messages without a protobuf type definition."
+authors = ["Ryan Winkelmaier <ryan.winkelmaier@nccgroup.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^2.7 || ^3.7"
+protobuf = [ { version = "^3.18", python = "^3.7" }, 
+             { version = "3.17.3", python = "^2.7" } ]
+six = "^1.16.0"
+
+
+[tool.poetry.dev-dependencies]
+pytest = [ { version = "^6.2", python = "^3.7" },
+           { version = "4.6.11", python = "^2.7" } ]
+# missing pytest dependency
+more_itertools = { version = "^5.0", python = "^2.7" }
+hypothesis = [ { version = "^6.21", python = "^3.7" },
+               { version = "4.57.1", python = "^2.7" } ]
+
+pylint = [ { version = "^2.11", python = "^3.7" },
+           { version = "1.9.5", python = "^2.7" } ]
+flake8 = "^3.9"
+black = { version = "^21", allow-prereleases = true, python = "^3.7" }
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
