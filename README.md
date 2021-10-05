@@ -23,8 +23,8 @@ for reverse engineering and forensics tooling.
 
 This repository contains two applications for working with protocol buffers:
 
-- A jython burp extension in /burp/
-- A python library that can be used in other appliations in /lib/
+- A jython burp extension in [burp/](https://github.com/nccgroup/blackboxprotobuf/tree/master/burp)
+- A python library that can be used in other appliations in [lib/](https://github.com/nccgroup/blackboxprotobuf/tree/master/lib)
 
 ## Future Tools
 
