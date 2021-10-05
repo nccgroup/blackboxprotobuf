@@ -6,7 +6,6 @@ import inspect
 _BASE_DIR = os.path.abspath(os.path.dirname(inspect.getfile(inspect.currentframe())) + '../../../')
 
 sys.path.insert(0, _BASE_DIR + '/lib/')
-#sys.path.insert(0, _BASE_DIR + '/burp/')
 sys.path.insert(0, _BASE_DIR + '/burp/deps/six/')
 sys.path.insert(0, _BASE_DIR + '/burp/deps/protobuf/python/')
 

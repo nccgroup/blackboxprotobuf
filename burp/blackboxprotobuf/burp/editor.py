@@ -603,7 +603,7 @@ class FilteredMessageModel(ListModel, ListDataListener):
         typedef = blackboxprotobuf.known_messages[typename]
         try:
             _, _ = blackboxprotobuf.protobuf_to_json(self._data, typedef)
-        except BlackboxProtobufExceptions as exc:
+        except BlackboxProtobufException as exc:
             self._callbacks.printError(traceback.format_exc())
             self._rejected_types.add(typename)
             return False
