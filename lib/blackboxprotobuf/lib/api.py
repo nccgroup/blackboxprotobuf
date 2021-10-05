@@ -41,9 +41,9 @@ def protobuf_to_json(*args, **kwargs):
     """
     value, message_type = decode_message(*args, **kwargs)
     value = json_safe_transform(value, message_type, False)
-    value = _sort_output(value, message_type)
+    value = sort_output(value, message_type)
     _annotate_typedef(message_type, value)
-    message_type = _sort_typedef(message_type)
+    message_type = sort_typedef(message_type)
     return json.dumps(value, indent=2), message_type
 
 def protobuf_from_json(json_str, message_type, *args, **kwargs):
@@ -209,7 +209,7 @@ def _get_typedef_for_message(field_typedef):
     else:
         raise TypedefException("Got 'message' type without typedef or type name: %s" % field_typedef)
 
-def _sort_output(value, typedef):
+def sort_output(value, typedef):
     """ Sort output by the field number in the typedef. Helps with readability
     in a JSON dump """
     output_dict = collections.OrderedDict()
@@ -221,12 +221,12 @@ def _sort_output(value, typedef):
                 field_name = field_def['name']
         if field_name in value:
             if field_def['type'] == 'message':
-                output_dict[field_name] = _sort_output(value[field_name], _get_typedef_for_message(field_def))
+                output_dict[field_name] = sort_output(value[field_name], _get_typedef_for_message(field_def))
             else:
                 output_dict[field_name] = value[field_name]
     return output_dict
 
-def _sort_typedef(typedef):
+def sort_typedef(typedef):
     """ Sort output by field number and sub_keys so name then type is first """
 
     TYPEDEF_KEY_ORDER = ['name', 'type', 'message_type_name', 'example_value_ignored']
@@ -243,7 +243,7 @@ def _sort_typedef(typedef):
 
             # TODO handle alt typedefs
             if key == 'message_typedef':
-                output_field_def[key] = _sort_typedef(value)
+                output_field_def[key] = sort_typedef(value)
             else:
                 output_field_def[key] = value
         output_dict[field_number] = output_field_def

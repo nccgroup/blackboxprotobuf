@@ -11,7 +11,7 @@ import re
 import six
 import logging
 from blackboxprotobuf.lib.exceptions import TypedefException
-import blackboxprotobuf.lib.interface
+import blackboxprotobuf.lib.api
 from blackboxprotobuf.lib.types import default_binary_type 
 
 PROTO_FILE_TYPE_MAP = {
@@ -75,7 +75,7 @@ def _print_message(message_name, typedef, output_file, depth = 0):
         raise TypedefException("Message name: %s is not valid" % message_name)
 
     #sort typedef for better looking output
-    typedef = blackboxprotobuf.lib.interface._sort_typedef(typedef)
+    typedef = blackboxprotobuf.lib.api.sort_typedef(typedef)
 
     message_name = message_name.strip()
     output_file.write(u'\n')

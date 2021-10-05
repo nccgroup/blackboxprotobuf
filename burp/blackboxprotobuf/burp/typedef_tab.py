@@ -14,7 +14,7 @@ from javax.swing.filechooser import FileNameExtensionFilter
 from java.awt import Component, Dimension
 from java.awt.event import ActionListener
 from javax.swing.border import EmptyBorder
-from blackboxprotobuf.lib.interface import _sort_typedef
+from blackboxprotobuf.lib.api import sort_typedef
 
 from blackboxprotobuf.burp import typedef_editor
 
@@ -128,7 +128,7 @@ class TypeDefinitionButtonListener(ActionListener):
             # Get's only the first value
             type_name = list_component.getSelectedValue()
             typedef_editor.TypeEditorWindow(self._typedef_tab._burp_callbacks,
-                                            _sort_typedef(blackboxprotobuf.known_messages[type_name]),
+                                            sort_typedef(blackboxprotobuf.known_messages[type_name]),
                                             self.create_save_callback(type_name)).show()
 
         elif event.getActionCommand() == "rename-type":
