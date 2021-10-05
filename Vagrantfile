@@ -10,9 +10,9 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     sudo apt-get update
     sudo apt-get install -y protobuf-compiler python-pip python3-pip
-    cd blackboxprotobuf
-    pip2 install -r lib-requirements.txt
-    pip3 install -r lib-requirements.txt
+    cd blackboxprotobuf/lib
+    pip2 install -r requirements.txt
+    pip3 install -r requirements.txt
     pip2 install -r tests/test-requirements.txt
     pip3 install -r tests/test-requirements.txt
   SHELL
