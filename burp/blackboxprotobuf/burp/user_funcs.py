@@ -31,27 +31,40 @@
                                                IParameter.PARAM_URL))
 """
 
+
 def detect_protobuf(content, is_request, content_info, helpers):
     """Customize protobuf detection. Passes in request. Should return True,
-       False, or None (to use default detection)"""
+    False, or None (to use default detection)"""
     pass
 
-def get_protobuf_data(content, is_request, content_info, helpers,
-                      request=None, request_content_info=None):
+
+def get_protobuf_data(
+    content, is_request, content_info, helpers, request=None, request_content_info=None
+):
     """Customize how the protobuf data is retrieved from the request. For
-       example, in a parameter or encoded."""
+    example, in a parameter or encoded."""
     pass
 
-def set_protobuf_data(protobuf_data, content, is_request, content_info, helpers,
-                      request=None, request_content_info=None):
+
+def set_protobuf_data(
+    protobuf_data,
+    content,
+    is_request,
+    content_info,
+    helpers,
+    request=None,
+    request_content_info=None,
+):
     """Customize how the protobuf data is set in request/response. For example,
-       in a parameter or encoded. Should mirror get_protobuf_data"""
+    in a parameter or encoded. Should mirror get_protobuf_data"""
     pass
 
-def hash_message(content, is_request, content_info, helpers,
-                 request=None, request_content_info=None):
+
+def hash_message(
+    content, is_request, content_info, helpers, request=None, request_content_info=None
+):
     """Customize how a request is identified for type definition saving. Two
-       requests will use the same type definition if this function returns the
-       same value.
+    requests will use the same type definition if this function returns the
+    same value.
     """
     pass

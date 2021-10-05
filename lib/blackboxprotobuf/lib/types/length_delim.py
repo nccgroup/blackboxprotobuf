@@ -10,10 +10,14 @@ from google.protobuf.internal import wire_format, encoder, decoder
 import blackboxprotobuf.lib
 from blackboxprotobuf.lib.types import varint
 from blackboxprotobuf.lib.exceptions import (
-    EncoderException, DecoderException, TypedefException, BlackboxProtobufException)
+    EncoderException,
+    DecoderException,
+    TypedefException,
+    BlackboxProtobufException,
+)
 
 # Turn on to get debug messages for binary field guessing
-#logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # Number of messages "deep" to keep guessing. Want to cap to prevent edge cases
 # where it attempts to parse a non-message binary as a message and it blows up
@@ -26,65 +30,85 @@ def encode_string(value):
     try:
         value = six.ensure_text(value)
     except TypeError as exc:
-        six.raise_from(EncoderException("Error encoding string to message: %r" % value), exc)
+        six.raise_from(
+            EncoderException("Error encoding string to message: %r" % value), exc
+        )
     return encode_bytes(value)
+
 
 def encode_bytes(value):
     """Encode varint length followed by the string.
-       This should also work to encode incoming string values.
+    This should also work to encode incoming string values.
     """
     if isinstance(value, bytearray):
         value = bytes(value)
     try:
         value = six.ensure_binary(value)
     except TypeError as exc:
-        six.raise_from(EncoderException("Error encoding bytes to message: %r" % value), exc)
+        six.raise_from(
+            EncoderException("Error encoding bytes to message: %r" % value), exc
+        )
     encoded_length = varint.encode_varint(len(value))
     return encoded_length + value
+
 
 def decode_bytes(value, pos):
     """Decode varint for the length and then returns that number of bytes"""
     length, pos = varint.decode_varint(value, pos)
-    end = pos+length
+    end = pos + length
     try:
         return value[pos:end], end
     except IndexError as exc:
-        six.raise_from(DecoderException(
-            ("Error decoding bytes. Decoded length %d is longer than bytes"
-             " available %d") % (length, len(value)-pos)), exc)
+        six.raise_from(
+            DecoderException(
+                (
+                    "Error decoding bytes. Decoded length %d is longer than bytes"
+                    " available %d"
+                )
+                % (length, len(value) - pos)
+            ),
+            exc,
+        )
+
 
 def encode_bytes_hex(value):
     """Encode varint length followed by the string.
-       Expects a string of hex characters
+    Expects a string of hex characters
     """
     try:
         return encode_bytes(binascii.unhexlify(value))
     except (TypeError, binascii.Error) as exc:
-        six.raise_from(EncoderException("Error encoding hex bytestring %s" % value), exc)
+        six.raise_from(
+            EncoderException("Error encoding hex bytestring %s" % value), exc
+        )
+
 
 def decode_bytes_hex(buf, pos):
     """Decode varint for length and then returns that number of bytes.
-       Outputs the bytes as a hex value
+    Outputs the bytes as a hex value
     """
     value, pos = decode_bytes(buf, pos)
     return binascii.hexlify(value), pos
 
+
 def decode_string(value, pos):
     """Decode varint for length and then the bytes"""
     length, pos = varint.decode_varint(value, pos)
-    end = pos+length
+    end = pos + length
     try:
         # backslash escaping isn't reversible easily
-        return value[pos:end].decode('utf-8'), end
+        return value[pos:end].decode("utf-8"), end
     except (TypeError, UnicodeDecodeError) as exc:
-        six.raise_from(DecoderException("Error decoding UTF-8 string %s" % value[pos:end]), exc)
+        six.raise_from(
+            DecoderException("Error decoding UTF-8 string %s" % value[pos:end]), exc
+        )
 
 
 def encode_message(data, typedef, path=None):
     """Encode a Python dictionary representing a protobuf message
-       data - Python dictionary mapping field numbers to values
-       typedef - Type information including field number, field name and field type
-       This will throw an exception if an unkown value is used as a key
+    data - Python dictionary mapping field numbers to values
+    typedef - Type information including field number, field name and field type
+    This will throw an exception if an unkown value is used as a key
     """
     output = bytearray()
     if path is None:
@@ -101,11 +125,15 @@ def encode_message(data, typedef, path=None):
             string_types = str
 
         if isinstance(field_number, string_types):
-            if '-' in field_number:
-                field_number, alt_field_number = field_number.split('-')
+            if "-" in field_number:
+                field_number, alt_field_number = field_number.split("-")
             # TODO can refactor to cache the name to number mapping
             for number, info in typedef.items():
-                if 'name' in info and info['name'] == field_number and field_number != '':
+                if (
+                    "name" in info
+                    and info["name"] == field_number
+                    and field_number != ""
+                ):
                     field_number = number
                     break
         else:
@@ -115,55 +143,71 @@ def encode_message(data, typedef, path=None):
         field_path.append(field_number)
 
         if field_number not in typedef:
-            raise EncoderException("Provided field name/number %s is not valid"
-                                   % (field_number), field_path)
+            raise EncoderException(
+                "Provided field name/number %s is not valid" % (field_number),
+                field_path,
+            )
 
         field_typedef = typedef[field_number]
 
         # Get encoder
-        if 'type' not in field_typedef:
-            raise TypedefException('Field %s does not have a defined type.' % field_number, field_path)
+        if "type" not in field_typedef:
+            raise TypedefException(
+                "Field %s does not have a defined type." % field_number, field_path
+            )
 
-        field_type = field_typedef['type']
+        field_type = field_typedef["type"]
 
         field_encoder = None
-        if field_type == 'message':
+        if field_type == "message":
             innertypedef = None
             # Check for a defined message type
             # TODO handle non dict alt_typdefs (eg. 'string'/'bytes' instead of a dict)
             if alt_field_number is not None:
-                if alt_field_number not in field_typedef['alt_typedefs']:
+                if alt_field_number not in field_typedef["alt_typedefs"]:
                     raise EncoderException(
-                        'Provided alt field name/number %s is not valid for field_number %s'
-                        % (alt_field_number, field_number), field_path)
-                innertypedef = field_typedef['alt_typedefs'][alt_field_number]
-            elif 'message_typedef' in field_typedef:
-                innertypedef = field_typedef['message_typedef']
-            elif 'message_type_name' in field_typedef:
-                message_type_name = field_typedef['message_type_name']
+                        "Provided alt field name/number %s is not valid for field_number %s"
+                        % (alt_field_number, field_number),
+                        field_path,
+                    )
+                innertypedef = field_typedef["alt_typedefs"][alt_field_number]
+            elif "message_typedef" in field_typedef:
+                innertypedef = field_typedef["message_typedef"]
+            elif "message_type_name" in field_typedef:
+                message_type_name = field_typedef["message_type_name"]
                 if message_type_name not in blackboxprotobuf.known_messages:
-                    raise TypedefException("Message type (%s) has not been defined"
-                                           % field_typedef['message_type_name'], field_path)
+                    raise TypedefException(
+                        "Message type (%s) has not been defined"
+                        % field_typedef["message_type_name"],
+                        field_path,
+                    )
                 innertypedef = blackboxprotobuf.known_messages[message_type_name]
             else:
-                raise TypedefException("Could not find message typedef for %s" % field_number, field_path)
+                raise TypedefException(
+                    "Could not find message typedef for %s" % field_number, field_path
+                )
 
-            field_encoder = lambda data: encode_lendelim_message(data, innertypedef, path=field_path)
+            field_encoder = lambda data: encode_lendelim_message(
+                data, innertypedef, path=field_path
+            )
         else:
             if field_type not in blackboxprotobuf.lib.types.encoders:
-                raise TypedefException('Unknown type: %s' % field_type)
+                raise TypedefException("Unknown type: %s" % field_type)
             field_encoder = blackboxprotobuf.lib.types.encoders[field_type]
             if field_encoder is None:
-                raise TypedefException('Encoder not implemented for %s' % field_type, field_path)
-
+                raise TypedefException(
+                    "Encoder not implemented for %s" % field_type, field_path
+                )
 
         # Encode the tag
-        tag = encoder.TagBytes(int(field_number), blackboxprotobuf.lib.types.wiretypes[field_type])
+        tag = encoder.TagBytes(
+            int(field_number), blackboxprotobuf.lib.types.wiretypes[field_type]
+        )
 
         try:
             # Handle repeated values
-            if isinstance(value, list) and not field_type.startswith('packed_'):
-                for repeated in  value:
+            if isinstance(value, list) and not field_type.startswith("packed_"):
+                for repeated in value:
                     output += tag
                     output += field_encoder(repeated)
             else:
@@ -175,9 +219,10 @@ def encode_message(data, typedef, path=None):
 
     return output
 
+
 def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
     """Decode a protobuf message with no length delimiter"""
-    #TODO recalculate and re-add path for errors
+    # TODO recalculate and re-add path for errors
     if end is None:
         end = len(buf)
 
@@ -201,33 +246,42 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
         field_typedef = typedef.get(field_number, {})
         field_key = _get_field_key(field_number, typedef)
         # Easy cases. Fixed size or bytes/string
-        if (wire_type in [wire_format.WIRETYPE_FIXED32,
-                         wire_format.WIRETYPE_FIXED64, wire_format.WIRETYPE_VARINT]
-           or ('type' in field_typedef and field_typedef['type'] != 'message')):
+        if wire_type in [
+            wire_format.WIRETYPE_FIXED32,
+            wire_format.WIRETYPE_FIXED64,
+            wire_format.WIRETYPE_VARINT,
+        ] or ("type" in field_typedef and field_typedef["type"] != "message"):
 
-            if 'type' not in field_typedef:
-                field_typedef['type'] = blackboxprotobuf.lib.types.wire_type_defaults[wire_type]
+            if "type" not in field_typedef:
+                field_typedef["type"] = blackboxprotobuf.lib.types.wire_type_defaults[
+                    wire_type
+                ]
             else:
                 # have a type, but make sure it matches the wiretype
-                if blackboxprotobuf.lib.types.wiretypes[field_typedef['type']] != wire_type:
+                if (
+                    blackboxprotobuf.lib.types.wiretypes[field_typedef["type"]]
+                    != wire_type
+                ):
                     raise DecoderException(
                         "Type %s from typedef did not match wiretype %s for "
-                        "field %s"
-                        % (field_typedef['type'], wire_type, field_key))
+                        "field %s" % (field_typedef["type"], wire_type, field_key)
+                    )
 
             # we already have a type, just map the decoder
-            if field_typedef['type'] not in blackboxprotobuf.lib.types.decoders:
-                raise TypedefException("Got unkown type % for field_number %"
-                        % (field_typedef['type'], field_number))
+            if field_typedef["type"] not in blackboxprotobuf.lib.types.decoders:
+                raise TypedefException(
+                    "Got unkown type % for field_number %"
+                    % (field_typedef["type"], field_number)
+                )
 
-            decoder = blackboxprotobuf.lib.types.decoders[field_typedef['type']]
-            field_outputs = [ decoder(buf, 0) for buf in buffers ]
+            decoder = blackboxprotobuf.lib.types.decoders[field_typedef["type"]]
+            field_outputs = [decoder(buf, 0) for buf in buffers]
 
             # this shouldn't happen, but let's check just in case
-            for buf, _pos in zip(buffers, [ y for _, y in field_outputs]):
-                assert(len(buf) == _pos)
+            for buf, _pos in zip(buffers, [y for _, y in field_outputs]):
+                assert len(buf) == _pos
 
-            field_outputs = [ value for (value, _) in field_outputs ]
+            field_outputs = [value for (value, _) in field_outputs]
             if len(field_outputs) == 1:
                 output[field_key] = field_outputs[0]
             else:
@@ -241,14 +295,15 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
 
     return output, typedef, pos
 
+
 def _group_by_number(buf, pos, end, path):
-    """ Parse through the whole message and return buffers based on wire type.
-        This forces us to parse the whole message at once, but I think we're
-        doing that anyway.
-        Returns a dictionary like:
-            {
-                "2": (<wiretype>, [<data>])
-            }
+    """Parse through the whole message and return buffers based on wire type.
+    This forces us to parse the whole message at once, but I think we're
+    doing that anyway.
+    Returns a dictionary like:
+        {
+            "2": (<wiretype>, [<data>])
+        }
     """
     # TODO Add path to error messages in here
     output_map = {}
@@ -260,9 +315,13 @@ def _group_by_number(buf, pos, end, path):
             else:
                 tag, pos = decoder._DecodeVarint(buf, pos)
         except (IndexError, decoder._DecodeError) as exc:
-            six.raise_from(DecoderException(
-                "Error decoding length from buffer: %r..." %
-                (binascii.hexlify(buf[pos : pos+8]))), exc)
+            six.raise_from(
+                DecoderException(
+                    "Error decoding length from buffer: %r..."
+                    % (binascii.hexlify(buf[pos : pos + 8]))
+                ),
+                exc,
+            )
 
         field_number, wire_type = wire_format.UnpackTag(tag)
 
@@ -270,9 +329,11 @@ def _group_by_number(buf, pos, end, path):
         field_number = str(field_number)
 
         if field_number in output_map and output_map[field_number][0] != wire_type:
-            """ This should never happen """
-            raise DecoderException("Field %s has mistmatched wiretypes. Previous: %s Now: %s"
-                        % (field_number, output_map[field_number][0], wire_type))
+            """This should never happen"""
+            raise DecoderException(
+                "Field %s has mistmatched wiretypes. Previous: %s Now: %s"
+                % (field_number, output_map[field_number][0], wire_type)
+            )
 
         length = None
         if wire_type == wire_format.WIRETYPE_VARINT:
@@ -288,15 +349,20 @@ def _group_by_number(buf, pos, end, path):
             # add on the length of the length tag as well
             bytes_length, new_pos = varint.decode_varint(buf, pos)
             length = bytes_length + (new_pos - pos)
-        elif wire_type in [wire_format.WIRETYPE_START_GROUP, wire_format.WIRETYPE_END_GROUP]:
+        elif wire_type in [
+            wire_format.WIRETYPE_START_GROUP,
+            wire_format.WIRETYPE_END_GROUP,
+        ]:
             raise DecoderException("GROUP wire types not supported")
         else:
             raise DecoderException("Got unkown wire type: %d" % wire_type)
         if pos + length > end:
-            raise DecoderException("Decoded length for field %s goes over end: %d > %d"
-                    % (field_number, pos + length, end))
+            raise DecoderException(
+                "Decoded length for field %s goes over end: %d > %d"
+                % (field_number, pos + length, end)
+            )
 
-        field_buf = buf[pos: pos + length]
+        field_buf = buf[pos : pos + length]
 
         if field_number in output_map:
             output_map[field_number][1].append(field_buf)
@@ -304,6 +370,7 @@ def _group_by_number(buf, pos, end, path):
             output_map[field_number] = (wire_type, [field_buf])
         pos += length
     return output_map, pos
+
 
 def _get_field_key(field_number, typedef):
     """If field_number has a name, then use that"""
@@ -313,16 +380,20 @@ def _get_field_key(field_number, typedef):
     if isinstance(field_number, int):
         field_number = str(field_number)
     alt_field_number = None
-    if '-' in field_number:
-        field_number, alt_field_number = field_number.split('-')
+    if "-" in field_number:
+        field_number, alt_field_number = field_number.split("-")
         # TODO
-        raise NotImplemented("Handling for _get_field_key not implemented for alt typedefs: %" % field_number)
-    if field_number in typedef and 'name' in typedef[field_number]:
-        field_key = typedef[field_number]['name']
+        raise NotImplemented(
+            "Handling for _get_field_key not implemented for alt typedefs: %"
+            % field_number
+        )
+    if field_number in typedef and "name" in typedef[field_number]:
+        field_key = typedef[field_number]["name"]
     else:
         field_key = field_number
     # Return the new field_name + alt_field_number
-    return field_key + ('' if alt_field_number is None else '-' + alt_field_number)
+    return field_key + ("" if alt_field_number is None else "-" + alt_field_number)
+
 
 def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_output):
     # This is where things get weird
@@ -348,20 +419,26 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
     try:
         outputs_map = {}
         # grab all dictonary alt_typedefs
-        all_typedefs = { key: value for key, value in
-                            field_typedef.get('alt_typedefs', {}).items() if isinstance(value, dict) }
-        all_typedefs["1"] = field_typedef.get('message_typedef', {})
+        all_typedefs = {
+            key: value
+            for key, value in field_typedef.get("alt_typedefs", {}).items()
+            if isinstance(value, dict)
+        }
+        all_typedefs["1"] = field_typedef.get("message_typedef", {})
 
         out_typedefs = {}
-
 
         for buf in buffers:
             output = None
             output_typedef = None
             output_typedef_num = None
-            for alt_typedef_num, alt_typedef in sorted(all_typedefs.items(), key=lambda x: int(x[0])):
+            for alt_typedef_num, alt_typedef in sorted(
+                all_typedefs.items(), key=lambda x: int(x[0])
+            ):
                 try:
-                    output, output_typedef, _ = decode_lendelim_message(buf, alt_typedef)
+                    output, output_typedef, _ = decode_lendelim_message(
+                        buf, alt_typedef
+                    )
                 except:
                     continue
                 output_typedef_num = alt_typedef_num
@@ -370,7 +447,9 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
             # let the error propogate up if we fail this
             if output is None:
                 output, output_typedef, _ = decode_lendelim_message(buf, {})
-                output_typedef_num = str( max([ int(i) for i in ["0"] + all_typedefs.keys()]) + 1 )
+                output_typedef_num = str(
+                    max([int(i) for i in ["0"] + all_typedefs.keys()]) + 1
+                )
 
             # save the output or typedef we found
             out_typedefs[output_typedef_num] = output_typedef
@@ -378,26 +457,32 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
             output_list.append(output)
             outputs_map[output_typedef_num] = output_list
         # was able to decode everything as a message
-        field_typedef['type'] = 'message'
-        field_typedef['message_typedef'] = all_typedefs["1"]
+        field_typedef["type"] = "message"
+        field_typedef["message_typedef"] = all_typedefs["1"]
         if len(all_typedefs.keys()) > 1:
             del all_typedefs["1"]
-            field_typedef['alt_typedefs'].update(all_typedefs)
+            field_typedef["alt_typedefs"].update(all_typedefs)
         # messages get set as "key-alt_number"
         for output_typedef_num, outputs in outputs_map.items():
             output_field_key = field_key
             if output_typedef_num != "1":
                 output_field_key += "-" + output_typedef_num
-            message_output[output_field_key] = outputs if len(outputs) > 1 else outputs[0]
+            message_output[output_field_key] = (
+                outputs if len(outputs) > 1 else outputs[0]
+            )
         # success, return
         return
     except DecoderException as exc:
         # this should be pretty common, don't be noisy or throw an exception
-        logging.debug("Could not decode a buffer for field number % as a message: ", field_key, exc)
+        logging.debug(
+            "Could not decode a buffer for field number % as a message: ",
+            field_key,
+            exc,
+        )
 
     # Decoding as a message did not work, try strings and then bytes
     # The bytes decoding should never fail
-    for target_type in ['string', default_bytes_type]:
+    for target_type in ["string", default_bytes_type]:
         try:
             outputs = []
             decoder = blackboxprotobuf.lib.types.decoders[target_type]
@@ -407,24 +492,33 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
 
             # all outputs worked, this is our type
             # check if there is a message type already in the typedef
-            if 'type' in field_typedef and 'message' == field_typedef['type']:
+            if "type" in field_typedef and "message" == field_typedef["type"]:
                 # we already had a message type. save it as an alt_typedef
 
                 # check if we already have this type as an alt_typedef
-                output_typedef_nums = { key: value for key, value in field_key['alt_typedefs'].items() if value == target_type }.keys()
+                output_typedef_nums = {
+                    key: value
+                    for key, value in field_key["alt_typedefs"].items()
+                    if value == target_type
+                }.keys()
                 output_typedef_num = None
                 if len(output_typedef_nums) == 0:
-                    output_typedef_num = str( max([ int(i) for i in ["0"] + all_typedefs.keys()]) + 1 )
-                    field_typedef['alt_typedefs'][output_typedef_num] = target_typedef
+                    output_typedef_num = str(
+                        max([int(i) for i in ["0"] + all_typedefs.keys()]) + 1
+                    )
+                    field_typedef["alt_typedefs"][output_typedef_num] = target_typedef
                 else:
                     output_typedef_num = output_typedef_nums[0]
-                message_output[field_key + "-" + output_tyepdef_num] = outputs if len(outputs) > 1 else outputs[0]
+                message_output[field_key + "-" + output_tyepdef_num] = (
+                    outputs if len(outputs) > 1 else outputs[0]
+                )
             else:
-                field_typedef['type'] = target_type
+                field_typedef["type"] = target_type
                 message_output[field_key] = outputs if len(outputs) > 1 else outputs[0]
             return
         except DecoderException as exc:
             continue
+
 
 def encode_lendelim_message(data, typedef, path=None):
     """Encode the length before the message"""
@@ -433,14 +527,17 @@ def encode_lendelim_message(data, typedef, path=None):
     logging.debug("Message length encoded: %d", len(length) + len(message_out))
     return length + message_out
 
+
 def decode_lendelim_message(buf, typedef=None, pos=0, depth=0, path=None):
     """Read in the length and use it as the end"""
     length, pos = varint.decode_varint(buf, pos)
-    ret = decode_message(buf, typedef, pos, pos+length, depth=depth, path=path)
+    ret = decode_message(buf, typedef, pos, pos + length, depth=depth, path=path)
     return ret
+
 
 def generate_packed_encoder(wrapped_encoder):
     """Generate an encoder for a packed type from the base type encoder"""
+
     def length_wrapper(values):
         """Encode repeat values and prefix with the length"""
         output = bytearray()
@@ -448,10 +545,13 @@ def generate_packed_encoder(wrapped_encoder):
             output += wrapped_encoder(value)
         length = varint.encode_varint(len(output))
         return length + output
+
     return length_wrapper
+
 
 def generate_packed_decoder(wrapped_decoder):
     """Generate an decoder for a packer type from a base type decoder"""
+
     def length_wrapper(buf, pos):
         """Decode repeat values prefixed with the length"""
         length, pos = varint.decode_varint(buf, pos)
@@ -462,8 +562,12 @@ def generate_packed_decoder(wrapped_decoder):
             output.append(value)
         if pos > end:
             raise DecoderException(
-                ("Error decoding packed field. Packed length larger than"
-                 " buffer: decoded = %d, left = %d")
-                % (length, len(buf) - pos))
+                (
+                    "Error decoding packed field. Packed length larger than"
+                    " buffer: decoded = %d, left = %d"
+                )
+                % (length, len(buf) - pos)
+            )
         return output, pos
+
     return length_wrapper

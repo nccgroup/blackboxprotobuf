@@ -8,16 +8,28 @@ import copy
 import struct
 import blackboxprotobuf
 from javax.swing import JSplitPane, JPanel, JButton, BoxLayout, JOptionPane
-from javax.swing import Box, JTextField, JScrollPane, JList, ListSelectionModel, ListModel
-from javax.swing.event import  ListSelectionListener, ListDataEvent, ListDataListener
+from javax.swing import (
+    Box,
+    JTextField,
+    JScrollPane,
+    JList,
+    ListSelectionModel,
+    ListModel,
+)
+from javax.swing.event import ListSelectionListener, ListDataEvent, ListDataListener
 from java.awt import Component, Dimension, FlowLayout
 from java.awt.event import ActionListener
 from javax.swing.border import EmptyBorder
 from blackboxprotobuf.burp import user_funcs
 from blackboxprotobuf.burp import typedef_editor
-from blackboxprotobuf.lib.exceptions import BlackboxProtobufException, DecoderException, EncoderException
+from blackboxprotobuf.lib.exceptions import (
+    BlackboxProtobufException,
+    DecoderException,
+    EncoderException,
+)
 
-NAME_REGEX = re.compile(r'\A[a-zA-Z_][a-zA-Z0-9_]*\Z')
+NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
+
 
 class ProtoBufEditorTabFactory(burp.IMessageEditorTabFactory):
     """Just returns instances of ProtoBufEditorTab"""
@@ -28,6 +40,7 @@ class ProtoBufEditorTabFactory(burp.IMessageEditorTabFactory):
     def createNewInstance(self, controller, editable):
         """Return new instance of editor tab for a new message"""
         return ProtoBufEditorTab(self._extender, controller, editable)
+
 
 class ProtoBufEditorTab(burp.IMessageEditorTab):
     """Tab in interceptor/repeater for editing protobuf message.
@@ -49,12 +62,13 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         self._last_valid_type_index = None
 
-        self._filtered_message_model = FilteredMessageModel(extension.known_message_model)
+        self._filtered_message_model = FilteredMessageModel(
+            extension.known_message_model
+        )
 
         self._type_list_component = JList(self._filtered_message_model)
         self._type_list_component.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
         self._type_list_component.addListSelectionListener(TypeListListener(self))
-
 
         self._new_type_field = JTextField()
 
@@ -62,7 +76,6 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._component.setLeftComponent(self._text_editor.getComponent())
         self._component.setRightComponent(self.createButtonPane())
         self._component.setResizeWeight(0.95)
-
 
         self.message_type = None
         self._is_request = None
@@ -87,15 +100,21 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
             json_data = self._text_editor.getText().tostring()
 
-            protobuf_data = blackboxprotobuf.protobuf_from_json(json_data, self.message_type)
+            protobuf_data = blackboxprotobuf.protobuf_from_json(
+                json_data, self.message_type
+            )
 
             protobuf_data = self.encodePayload(protobuf_data)
-            if 'set_protobuf_data' in dir(user_funcs):
+            if "set_protobuf_data" in dir(user_funcs):
                 result = user_funcs.set_protobuf_data(
-                    protobuf_data, self._original_content,
-                    self._is_request, self._content_info,
-                    self._helpers, self._request,
-                    self._request_content_info)
+                    protobuf_data,
+                    self._original_content,
+                    self._is_request,
+                    self._content_info,
+                    self._helpers,
+                    self._request,
+                    self._request_content_info,
+                )
                 if result is not None:
                     return result
 
@@ -104,19 +123,22 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         except Exception as exc:
             self._callbacks.printError(traceback.format_exc())
-            JOptionPane.showMessageDialog(self._component, "Error encoding protobuf: " + str(exc))
+            JOptionPane.showMessageDialog(
+                self._component, "Error encoding protobuf: " + str(exc)
+            )
             # Resets state
             return self._original_content
 
     def setMessage(self, content, is_request, retry=True):
         """Get the data from the request/response and parse into JSON.
-           sets self.message_type
+        sets self.message_type
         """
         # Save original content
         self._original_content = content
         if is_request:
-            self._content_info = self._helpers.analyzeRequest(self._controller.getHttpService(),
-                                                              content)
+            self._content_info = self._helpers.analyzeRequest(
+                self._controller.getHttpService(), content
+            )
         else:
             self._content_info = self._helpers.analyzeResponse(content)
         self._is_request = is_request
@@ -126,7 +148,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         if not is_request:
             self._request = self._controller.getRequest()
             self._request_content_info = self._helpers.analyzeRequest(
-                self._controller.getHttpService(), self._request)
+                self._controller.getHttpService(), self._request
+            )
 
         # how we remember which message type correlates to which endpoint
         self._message_hash = self.getMessageHash()
@@ -137,16 +160,21 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         if self._message_hash in self._extension.saved_types:
             typename = self._extension.saved_types[self._message_hash]
             self.message_type_name = typename
-            self.message_type  = blackboxprotobuf.known_messages[typename]
+            self.message_type = blackboxprotobuf.known_messages[typename]
 
         try:
             protobuf_data = None
-            if 'get_protobuf_data' in dir(user_funcs):
+            if "get_protobuf_data" in dir(user_funcs):
                 protobuf_data = user_funcs.get_protobuf_data(
-                    content, is_request, self._content_info, self._helpers,
-                    self._request, self._request_content_info)
+                    content,
+                    is_request,
+                    self._content_info,
+                    self._helpers,
+                    self._request,
+                    self._request_content_info,
+                )
             if protobuf_data is None:
-                protobuf_data = content[self._content_info.getBodyOffset():].tostring()
+                protobuf_data = content[self._content_info.getBodyOffset() :].tostring()
 
             protobuf_data = self.decodePayload(protobuf_data)
 
@@ -156,7 +184,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             self._filtered_message_model.set_new_data(protobuf_data)
             self._source_typedef = self.message_type
             json_data, self.message_type = blackboxprotobuf.protobuf_to_json(
-                protobuf_data, self.message_type)
+                protobuf_data, self.message_type
+            )
 
             self._original_json = json_data
             self._original_typedef = self.message_type
@@ -178,31 +207,33 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def decodePayload(self, payload):
         """Add support for decoding a few default methods. Including Base64 and GZIP"""
-        if payload.startswith(bytearray([0x1f, 0x8b, 0x08])):
+        if payload.startswith(bytearray([0x1F, 0x8B, 0x08])):
             gzip_decompress = zlib.decompressobj(-zlib.MAX_WBITS)
-            self._encoder = 'gzip'
+            self._encoder = "gzip"
             return gzip_decompress.decompress(payload)
 
         # Try to base64 decode
         try:
             protobuf = base64.b64decode(payload, validate=True)
-            self._encoder = 'base64'
+            self._encoder = "base64"
             return protobuf
         except Exception as exc:
             pass
 
         # try decoding as a gRPC payload: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
         # we're naiively handling only uncompressed payloads
-        if len(payload) > 1 + 4 and payload.startswith(bytearray([0x00])): # gRPC has 1 byte flag + 4 byte length
+        if len(payload) > 1 + 4 and payload.startswith(
+            bytearray([0x00])
+        ):  # gRPC has 1 byte flag + 4 byte length
             (message_length,) = struct.unpack_from(">I", payload[1:])
             if len(payload) == 1 + 4 + message_length:
-                self._encoder = 'gRPC'
-                return payload[1 + 4:]
-        #try:
+                self._encoder = "gRPC"
+                return payload[1 + 4 :]
+        # try:
         #    protobuf = base64.urlsafe_b64decode(payload)
         #    self._encoder = 'base64_url'
         #    return protobuf
-        #except Exception as exc:
+        # except Exception as exc:
         #    pass
 
         self._encoder = None
@@ -210,17 +241,17 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def encodePayload(self, payload):
         """If we detected an encoding like gzip or base64 when decoding, redo
-           that encoding step here
+        that encoding step here
         """
-        if self._encoder == 'base64':
+        if self._encoder == "base64":
             return base64.b64encode(payload)
-        elif self._encoder == 'base64_url':
-            return  base64.urlsafe_b64encode(payload)
-        elif self._encoder == 'gzip':
+        elif self._encoder == "base64_url":
+            return base64.urlsafe_b64encode(payload)
+        elif self._encoder == "gzip":
             gzip_compress = zlib.compressobj(-1, zlib.DEFLATED, -zlib.MAX_WBITS)
-            self._encoder = 'gzip'
+            self._encoder = "gzip"
             return gzip_compress.compress(payload)
-        elif self._encoder == 'gRPC':
+        elif self._encoder == "gRPC":
             message_length = struct.pack(">I", len(payload))
             return bytearray([0x00]) + bytearray(message_length) + payload
         else:
@@ -236,7 +267,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def isEnabled(self, content, is_request):
         """Try to detect a protobuf in the message to enable the tab. Defaults
-           to content-type header of 'x-protobuf'. User overridable
+        to content-type header of 'x-protobuf'. User overridable
         """
         # TODO implement some more default checks
         if is_request:
@@ -244,8 +275,10 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         else:
             info = self._helpers.analyzeResponse(content)
 
-        if 'detect_protobuf' in dir(user_funcs):
-            result = user_funcs.detect_protobuf(content, is_request, info, self._helpers)
+        if "detect_protobuf" in dir(user_funcs):
+            result = user_funcs.detect_protobuf(
+                content, is_request, info, self._helpers
+            )
             if result is not None:
                 return result
 
@@ -253,10 +286,14 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         if info.getBodyOffset() == len(content):
             return False
 
-        protobuf_content_types = ['x-protobuf', 'application/protobuf', 'application/grpc']
+        protobuf_content_types = [
+            "x-protobuf",
+            "application/protobuf",
+            "application/grpc",
+        ]
         # Check all headers for x-protobuf
         for header in info.getHeaders():
-            if 'content-type' in header.lower():
+            if "content-type" in header.lower():
                 for protobuf_content_type in protobuf_content_types:
                     if protobuf_content_type in header.lower():
                         return True
@@ -273,7 +310,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         panel = JPanel()
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
-        panel.setBorder(EmptyBorder(5,5,5,5))
+        panel.setBorder(EmptyBorder(5, 5, 5, 5))
 
         panel.add(Box.createRigidArea(Dimension(0, 5)))
         type_scroll_pane = JScrollPane(self._type_list_component)
@@ -286,7 +323,11 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         new_type_panel.setLayout(BoxLayout(new_type_panel, BoxLayout.X_AXIS))
         new_type_panel.add(self._new_type_field)
         new_type_panel.add(Box.createRigidArea(Dimension(3, 0)))
-        new_type_panel.add(self.createButton("New", "new-type", "Save this message's type under a new name"))
+        new_type_panel.add(
+            self.createButton(
+                "New", "new-type", "Save this message's type under a new name"
+            )
+        )
         new_type_panel.setMaximumSize(Dimension(200, 20))
         new_type_panel.setMinimumSize(Dimension(150, 20))
 
@@ -295,10 +336,24 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         button_panel = JPanel()
         button_panel.setLayout(FlowLayout())
         if self._editable:
-            button_panel.add(self.createButton("Validate", "validate", "Validate the message can be encoded."))
-        button_panel.add(self.createButton("Edit Type", "edit-type", "Edit the message type"))
-        button_panel.add(self.createButton("Reset Message", "reset", "Reset the message and undo changes"))
-        button_panel.add(self.createButton("Clear Type", "clear-type", "Reparse the message with an empty type"))
+            button_panel.add(
+                self.createButton(
+                    "Validate", "validate", "Validate the message can be encoded."
+                )
+            )
+        button_panel.add(
+            self.createButton("Edit Type", "edit-type", "Edit the message type")
+        )
+        button_panel.add(
+            self.createButton(
+                "Reset Message", "reset", "Reset the message and undo changes"
+            )
+        )
+        button_panel.add(
+            self.createButton(
+                "Clear Type", "clear-type", "Reparse the message with an empty type"
+            )
+        )
         button_panel.setMinimumSize(Dimension(100, 200))
         button_panel.setPreferredSize(Dimension(200, 1000))
 
@@ -317,7 +372,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def validateMessage(self):
         """Callback for validate button. Attempts to encode the message with
-           the current type definition
+        the current type definition
         """
         try:
             json_data = self._text_editor.getText().tostring()
@@ -331,7 +386,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def resetMessage(self):
         """Drop any changes and reset the message. Callback for "reset"
-           button
+        button
         """
 
         self._last_set_json = str(self._original_json)
@@ -340,21 +395,27 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def getMessageHash(self):
         """Compute an "identifier" for the message which is used for sticky
-           type definitions. User modifiable
+        type definitions. User modifiable
         """
         message_hash = None
-        if 'hash_message' in dir(user_funcs):
+        if "hash_message" in dir(user_funcs):
             message_hash = user_funcs.hash_message(
-                self._original_content, self._is_request, self._content_info,
-                self._helpers, self._request, self._request_content_info)
+                self._original_content,
+                self._is_request,
+                self._content_info,
+                self._helpers,
+                self._request,
+                self._request_content_info,
+            )
         if message_hash is None:
             # Base it off just the URL and request/response
 
-            content_info = self._content_info if self._is_request else self._request_content_info
+            content_info = (
+                self._content_info if self._is_request else self._request_content_info
+            )
             url = content_info.getUrl().getPath()
-            message_hash = ':'.join([url, str(self._is_request)])
+            message_hash = ":".join([url, str(self._is_request)])
         return message_hash
-
 
     def forceSelectType(self, typename):
         index = self._filtered_message_model.get_type_index(typename)
@@ -363,7 +424,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             self._type_list_component.setSelectedIndex(index)
 
     def updateTypeSelection(self):
-        """ Apply a new typedef based on the selected type in the type list """
+        """Apply a new typedef based on the selected type in the type list"""
         # Check if something is selected
         if self._type_list_component.isSelectionEmpty():
             return
@@ -386,14 +447,22 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             self._callbacks.printError(traceback.format_exc())
 
             if isinstance(exc, EncoderException):
-                JOptionPane.showMessageDialog(self._component, "Error encoding protobuf with previous type: %s" % (exc))
+                JOptionPane.showMessageDialog(
+                    self._component,
+                    "Error encoding protobuf with previous type: %s" % (exc),
+                )
             elif isinstance(exc, DecoderException):
-                JOptionPane.showMessageDialog(self._component, "Error encoding protobuf with type %s: %s" % (type_name, exc))
+                JOptionPane.showMessageDialog(
+                    self._component,
+                    "Error encoding protobuf with type %s: %s" % (type_name, exc),
+                )
                 # decoder exception means it doesn't match the message that was sucessfully encoded by the prev type
                 self._filtered_message_model.remove_type(type_name)
 
             if self._last_valid_type_index is not None:
-                type_name = self._type_list_component.setSelectedIndex(self._last_valid_type_index)
+                type_name = self._type_list_component.setSelectedIndex(
+                    self._last_valid_type_index
+                )
             else:
                 self._type_list_component.clearSelection()
             return
@@ -402,16 +471,15 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._last_valid_type_index = self._type_list_component.getSelectedIndex()
 
     def editType(self, typedef):
-        """ Apply the new typedef. Use dict.update to change the original
+        """Apply the new typedef. Use dict.update to change the original
         dictionary, so we also update the anonymous cached definition and ones
-        stored in known_messages """
+        stored in known_messages"""
         # TODO this is kind of an ugly hack. Should redo how these are referenced
         # probably means rewriting a bunch of the editor
         old_source = self._source_typedef
         old_source.clear()
         old_source.update(typedef)
         self.applyType(old_source)
-
 
     def applyType(self, typedef):
         """Apply a new typedef to the message. Throws an exception if type is invalid."""
@@ -422,7 +490,9 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         json_data = self._text_editor.getText().tostring()
         protobuf_data = blackboxprotobuf.protobuf_from_json(json_data, old_message_type)
 
-        new_json, message_type = blackboxprotobuf.protobuf_to_json(str(protobuf_data), typedef)
+        new_json, message_type = blackboxprotobuf.protobuf_to_json(
+            str(protobuf_data), typedef
+        )
 
         # Should exception out before now if there is an issue
         self.message_type = message_type
@@ -434,19 +504,20 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._text_editor.setText(str(new_json))
 
     def saveAsNewType(self):
-        """ Copy the current type into known_messages """
+        """Copy the current type into known_messages"""
         name = self._new_type_field.getText().strip()
         if not NAME_REGEX.match(name):
-            JOptionPane.showMessageDialog(self._component,
+            JOptionPane.showMessageDialog(
+                self._component,
                 "%s is not a valid "
-                "message name. Message names should be alphanumeric."
-                % name)
+                "message name. Message names should be alphanumeric." % name,
+            )
             return
         if name in blackboxprotobuf.known_messages:
-            JOptionPane.showMessageDialog(self._component, "Message name %s is "
-            "already taken." % name)
+            JOptionPane.showMessageDialog(
+                self._component, "Message name %s is " "already taken." % name
+            )
             return
-
 
         # Do a deep copy on the dictionary so we don't accidentally modify others
         blackboxprotobuf.known_messages[name] = copy.deepcopy(self.message_type)
@@ -460,8 +531,10 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._type_list_component.clearSelection()
         self._new_type_field.setText("")
 
+
 class EditorButtonListener(ActionListener):
     """Callback listener for buttons in the message editor tab"""
+
     def __init__(self, editor_tab):
         self._editor_tab = editor_tab
 
@@ -476,14 +549,17 @@ class EditorButtonListener(ActionListener):
             typedef_editor.TypeEditorWindow(
                 self._editor_tab._callbacks,
                 self._editor_tab.message_type,
-                self._editor_tab.editType).show()
+                self._editor_tab.editType,
+            ).show()
         elif event.getActionCommand() == "new-type":
             self._editor_tab.saveAsNewType()
         elif event.getActionCommand() == "clear-type":
             self._editor_tab.clearType()
 
+
 class TypeListListener(ListSelectionListener):
-    """ Callback listener for when a new type is selected form the list """
+    """Callback listener for when a new type is selected form the list"""
+
     def __init__(self, editor_tab):
         self._editor_tab = editor_tab
 
@@ -492,9 +568,10 @@ class TypeListListener(ListSelectionListener):
             return
         self._editor_tab.updateTypeSelection()
 
+
 class FilteredMessageModel(ListModel, ListDataListener):
-    """ listens to a java ListModel and keeps a subset with just valid types
-    for a message """
+    """listens to a java ListModel and keeps a subset with just valid types
+    for a message"""
 
     def __init__(self, parent):
         self._data = None
@@ -521,7 +598,9 @@ class FilteredMessageModel(ListModel, ListDataListener):
             if not self._check_type(typename):
                 removed_index = self._types.index(type_name)
                 self._types.remove(type_name)
-                event = ListDataEvent(self, ListDataEvent.INTERVAL_REMOVED, removed_index, removed_index)
+                event = ListDataEvent(
+                    self, ListDataEvent.INTERVAL_REMOVED, removed_index, removed_index
+                )
                 self._send_event(event)
 
         interval_start = len(self._types)
@@ -530,7 +609,9 @@ class FilteredMessageModel(ListModel, ListDataListener):
                 self._types.append(typename)
 
         if len(self._types) > interval_start:
-            event = ListDataEvent(self, ListDataEvent.INTERVAL_ADDED, interval_start, len(self._types) - 1)
+            event = ListDataEvent(
+                self, ListDataEvent.INTERVAL_ADDED, interval_start, len(self._types) - 1
+            )
             self._send_event(event)
 
     def get_type_index(self, typename):
@@ -549,7 +630,9 @@ class FilteredMessageModel(ListModel, ListDataListener):
         self._working_types.remove(typename)
         self._rejected_types.add(typename)
 
-        event = ListDataEvent(self, ListDataEvent.INTERVAL_REMOVED, type_index, type_index)
+        event = ListDataEvent(
+            self, ListDataEvent.INTERVAL_REMOVED, type_index, type_index
+        )
         self._send_event(event)
 
     def update_types(self):
@@ -562,7 +645,9 @@ class FilteredMessageModel(ListModel, ListDataListener):
             if type_name in self._types:
                 removed_index = self._types.index(type_name)
                 self._types.remove(type_name)
-                event = ListDataEvent(self, ListDataEvent.INTERVAL_REMOVED, removed_index, removed_index)
+                event = ListDataEvent(
+                    self, ListDataEvent.INTERVAL_REMOVED, removed_index, removed_index
+                )
                 self._send_event(event)
 
         interval_start = len(self._types)
@@ -573,9 +658,10 @@ class FilteredMessageModel(ListModel, ListDataListener):
         # not sure how much effort we want to put into the events. could just mark everything as changed all the time
         if len(self._types) > interval_start:
             # if we didn't remove anything, then  just issue an added event?
-            event = ListDataEvent(self, ListDataEvent.INTERVAL_ADDED, interval_start, len(self._types) - 1)
+            event = ListDataEvent(
+                self, ListDataEvent.INTERVAL_ADDED, interval_start, len(self._types) - 1
+            )
             self._send_event(event)
-
 
     def _send_event(self, event):
         event_type = event.getType()

@@ -6,12 +6,23 @@ import json
 import blackboxprotobuf
 from java.awt import Component, Dimension, Frame
 from java.awt.event import ActionListener, WindowEvent
-from javax.swing import JSplitPane, JPanel, JButton, BoxLayout, JOptionPane, JDialog, Box, JTextField
+from javax.swing import (
+    JSplitPane,
+    JPanel,
+    JButton,
+    BoxLayout,
+    JOptionPane,
+    JDialog,
+    Box,
+    JTextField,
+)
+
 
 class TypeEditorWindow(JDialog):
     """New free-standing window for editing a specified type definition. Will
-       callback into the calling class when the type is saved
+    callback into the calling class when the type is saved
     """
+
     def __init__(self, burp_callbacks, typedef, callback):
         burp_window = None
         for frame in Frame.getFrames():
@@ -21,7 +32,7 @@ class TypeEditorWindow(JDialog):
         JDialog.__init__(self, burp_window)
         self._burp_callbacks = burp_callbacks
         self._type_callback = callback
-        self.setSize(1000,700)
+        self.setSize(1000, 700)
 
         self._original_typedef = typedef
         self._type_editor = burp_callbacks.createTextEditor()
@@ -43,7 +54,9 @@ class TypeEditorWindow(JDialog):
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
 
         panel.add(Box.createRigidArea(Dimension(0, 5)))
-        panel.add(self.createButton("Validate", "validate", "Check if typedef is valid" ))
+        panel.add(
+            self.createButton("Validate", "validate", "Check if typedef is valid")
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Save", "save", "Save the typedef"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
@@ -65,7 +78,7 @@ class TypeEditorWindow(JDialog):
 
     def applyType(self):
         """Callback for the apply button. Validates the definition and calls
-           the callback provided when opening the window
+        the callback provided when opening the window
         """
         try:
             message_type = json.loads(self._type_editor.getText().tostring())
@@ -102,8 +115,10 @@ class TypeEditorWindow(JDialog):
             JOptionPane.showMessageDialog(self, "Error validating type: " + str(exc))
             return
 
+
 class TypeEditorButtonListener(ActionListener):
     """Button action listener for the type editor window"""
+
     def __init__(self, type_editor):
         self._type_editor = type_editor
 

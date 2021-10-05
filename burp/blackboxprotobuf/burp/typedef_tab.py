@@ -19,7 +19,9 @@ from blackboxprotobuf.lib.api import sort_typedef
 from blackboxprotobuf.burp import typedef_editor
 
 # TODO put these in one place
-NAME_REGEX = re.compile(r'\A[a-zA-Z_][a-zA-Z0-9_]*\Z')
+NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
+
+
 class TypeDefinitionTab(burp.ITab):
     """Implements an interface for editing known message type definitions."""
 
@@ -28,7 +30,9 @@ class TypeDefinitionTab(burp.ITab):
         self._extension = extension
 
         self._type_list_component = JList(extension.known_message_model)
-        self._type_list_component.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
+        self._type_list_component.setSelectionMode(
+            ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
+        )
 
         self._component = JPanel()
         self._component.setLayout(BoxLayout(self._component, BoxLayout.Y_AXIS))
@@ -37,12 +41,11 @@ class TypeDefinitionTab(burp.ITab):
         splitPane.setRightComponent(JScrollPane(self._type_list_component))
         splitPane.setLeftComponent(self.createButtonPane())
         splitPane.setResizeWeight(0.03)
-        splitPane.setMaximumSize(Dimension(1000 ,1000));
+        splitPane.setMaximumSize(Dimension(1000, 1000))
 
         self._component.add(splitPane)
         self._component.add(Box.createVerticalGlue())
         self._component.setBorder(EmptyBorder(10, 10, 10, 10))
-
 
     def getTabCaption(self):
         """Returns name on tab"""
@@ -64,17 +67,41 @@ class TypeDefinitionTab(burp.ITab):
         panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Edit", "edit-type", "Edit the selected type"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Rename", "rename-type", "Rename the selected type"))
+        panel.add(
+            self.createButton("Rename", "rename-type", "Rename the selected type")
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Remove", "delete-type", "Delete all selected types"))
+        panel.add(
+            self.createButton("Remove", "delete-type", "Delete all selected types")
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Save All Types To File", "save-types", "Save all known types as JSON to a file"))
+        panel.add(
+            self.createButton(
+                "Save All Types To File",
+                "save-types",
+                "Save all known types as JSON to a file",
+            )
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Load All Types From File", "load-types", "Load types from JSON file"))
+        panel.add(
+            self.createButton(
+                "Load All Types From File", "load-types", "Load types from JSON file"
+            )
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Export All types As .proto", "export-proto", "Export all types as .proto"))
+        panel.add(
+            self.createButton(
+                "Export All types As .proto",
+                "export-proto",
+                "Export all types as .proto",
+            )
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Import .proto", "import-proto", "Import types from a .proto file"))
+        panel.add(
+            self.createButton(
+                "Import .proto", "import-proto", "Import types from a .proto file"
+            )
+        )
         panel.add(Box.createRigidArea(Dimension(0, 3)))
         return panel
 
@@ -87,22 +114,26 @@ class TypeDefinitionTab(burp.ITab):
         button.setToolTipText(tooltip)
         return button
 
+
 class TypeDefinitionButtonListener(ActionListener):
     """Callback listener for buttons in the TypeDefinition interface"""
+
     def __init__(self, typedef_tab):
         self._typedef_tab = typedef_tab
 
     def create_save_callback(self, name):
         """Generate a callback for when the save button inside an opened type
-           editor window is saved. Saves the type and tells the list to
-           refresh.
+        editor window is saved. Saves the type and tells the list to
+        refresh.
         """
+
         def save_callback(typedef):
             """Save typedef and update list for a given message name"""
             if name not in blackboxprotobuf.known_messages:
                 self._typedef_tab._extension.known_message_model.addElement(name)
 
             blackboxprotobuf.known_messages[name] = typedef
+
         return save_callback
 
     def actionPerformed(self, event):
@@ -112,12 +143,17 @@ class TypeDefinitionButtonListener(ActionListener):
 
             # Error out if already defined
             if type_name in blackboxprotobuf.known_messages:
-                JOptionPane.showMessageDialog(self._typedef_tab._component,
-                                              "Message type \"%s\" already exists" % type_name)
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    'Message type "%s" already exists' % type_name,
+                )
                 return
 
-            typedef_editor.TypeEditorWindow(self._typedef_tab._burp_callbacks,
-                                            {}, self.create_save_callback(type_name)).show()
+            typedef_editor.TypeEditorWindow(
+                self._typedef_tab._burp_callbacks,
+                {},
+                self.create_save_callback(type_name),
+            ).show()
 
         elif event.getActionCommand() == "edit-type":
             list_component = self._typedef_tab._type_list_component
@@ -127,9 +163,11 @@ class TypeDefinitionButtonListener(ActionListener):
 
             # Get's only the first value
             type_name = list_component.getSelectedValue()
-            typedef_editor.TypeEditorWindow(self._typedef_tab._burp_callbacks,
-                                            sort_typedef(blackboxprotobuf.known_messages[type_name]),
-                                            self.create_save_callback(type_name)).show()
+            typedef_editor.TypeEditorWindow(
+                self._typedef_tab._burp_callbacks,
+                sort_typedef(blackboxprotobuf.known_messages[type_name]),
+                self.create_save_callback(type_name),
+            ).show()
 
         elif event.getActionCommand() == "rename-type":
             list_component = self._typedef_tab._type_list_component
@@ -139,18 +177,26 @@ class TypeDefinitionButtonListener(ActionListener):
 
             # Get's only the first value
             previous_type_name = list_component.getSelectedValue()
-            new_type_name = JOptionPane.showInputDialog("Enter new name for %s:" % previous_type_name)
+            new_type_name = JOptionPane.showInputDialog(
+                "Enter new name for %s:" % previous_type_name
+            )
             if new_type_name in blackboxprotobuf.known_messages:
-                JOptionPane.showMessageDialog(self._typedef_tab._component,
-                                              "Message type \"%s\" already exists" % new_type_name)
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    'Message type "%s" already exists' % new_type_name,
+                )
                 return
             if previous_type_name not in blackboxprotobuf.known_messages:
-                JOptionPane.showMessageDialog(self._typedef_tab._component,
-                                              "Message type \"%s\" does not exist" % previous_type_name)
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    'Message type "%s" does not exist' % previous_type_name,
+                )
                 return
             if not NAME_REGEX.match(new_type_name):
-                JOptionPane.showMessageDialog(self._typedef_tab._component,
-                                              "Message type name \"%s\" is not valid." % new_type_name)
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    'Message type name "%s" is not valid.' % new_type_name,
+                )
                 return
             typedef = blackboxprotobuf.known_messages[previous_type_name]
             blackboxprotobuf.known_messages[new_type_name] = typedef
@@ -168,101 +214,159 @@ class TypeDefinitionButtonListener(ActionListener):
                 return
 
             type_names = list_component.getSelectedValuesList()
-            #TODO Confirm delete?
+            # TODO Confirm delete?
             for type_name in type_names:
                 del blackboxprotobuf.known_messages[type_name]
             self._typedef_tab._extension.refresh_message_model()
 
-        elif event.getActionCommand() == 'save-types':
+        elif event.getActionCommand() == "save-types":
             chooser = JFileChooser()
-            chooser.setFileFilter(FileNameExtensionFilter("JSON Type Definition", ["json"]))
+            chooser.setFileFilter(
+                FileNameExtensionFilter("JSON Type Definition", ["json"])
+            )
             chooser.setMultiSelectionEnabled(False)
 
             action = chooser.showSaveDialog(self._typedef_tab.getUiComponent())
-            if action == JFileChooser.CANCEL_OPTION or action == JFileChooser.ERROR_OPTION:
+            if (
+                action == JFileChooser.CANCEL_OPTION
+                or action == JFileChooser.ERROR_OPTION
+            ):
                 return
 
             file_name = chooser.getSelectedFile().getCanonicalPath()
             ext = os.path.splitext(file_name)[1]
-            if ext == '':
-                #No extension, add .json
-                file_name += '.json'
+            if ext == "":
+                # No extension, add .json
+                file_name += ".json"
 
-            with open(file_name, 'w+') as selected_file:
-                json.dump(blackboxprotobuf.known_messages, selected_file, indent=4, sort_keys=True)
+            with open(file_name, "w+") as selected_file:
+                json.dump(
+                    blackboxprotobuf.known_messages,
+                    selected_file,
+                    indent=4,
+                    sort_keys=True,
+                )
 
-        elif event.getActionCommand() == 'load-types':
+        elif event.getActionCommand() == "load-types":
             chooser = JFileChooser()
-            chooser.setFileFilter(FileNameExtensionFilter("JSON Type Definition", ["json"]))
+            chooser.setFileFilter(
+                FileNameExtensionFilter("JSON Type Definition", ["json"])
+            )
             chooser.setMultiSelectionEnabled(False)
 
             action = chooser.showOpenDialog(self._typedef_tab.getUiComponent())
-            if action == JFileChooser.CANCEL_OPTION or action == JFileChooser.ERROR_OPTION:
+            if (
+                action == JFileChooser.CANCEL_OPTION
+                or action == JFileChooser.ERROR_OPTION
+            ):
                 return
 
             file_name = chooser.getSelectedFile().getCanonicalPath()
             types = {}
-            with open(file_name, 'r') as selected_file:
+            with open(file_name, "r") as selected_file:
                 types = json.load(selected_file)
             for key, value in types.items():
                 # check to make sure we don't nuke existing messages
                 if key in blackboxprotobuf.known_messages:
-                    overwrite = JOptionPane.showConfirmDialog(self._typedef_tab._component, "Message %s already saved. Overwrite?" % key) == 0
+                    overwrite = (
+                        JOptionPane.showConfirmDialog(
+                            self._typedef_tab._component,
+                            "Message %s already saved. Overwrite?" % key,
+                        )
+                        == 0
+                    )
                     if not overwrite:
                         continue
                 blackboxprotobuf.known_messages[key] = value
             self._typedef_tab._extension.refresh_message_model()
-        elif event.getActionCommand() == 'export-proto':
+        elif event.getActionCommand() == "export-proto":
             chooser = JFileChooser()
-            chooser.setFileFilter(FileNameExtensionFilter("Protobuf Type Definition", ["proto"]))
+            chooser.setFileFilter(
+                FileNameExtensionFilter("Protobuf Type Definition", ["proto"])
+            )
             chooser.setMultiSelectionEnabled(False)
 
             action = chooser.showSaveDialog(self._typedef_tab.getUiComponent())
-            if action == JFileChooser.CANCEL_OPTION or action == JFileChooser.ERROR_OPTION:
+            if (
+                action == JFileChooser.CANCEL_OPTION
+                or action == JFileChooser.ERROR_OPTION
+            ):
                 return
 
             file_name = chooser.getSelectedFile().getCanonicalPath()
             ext = os.path.splitext(file_name)[1]
-            if ext == '':
-                #No extension, add .proto
-                file_name += '.proto'
+            if ext == "":
+                # No extension, add .proto
+                file_name += ".proto"
 
             if os.path.exists(file_name):
                 # 0 is the YES option
-                overwrite = JOptionPane.showConfirmDialog(self._typedef_tab._component, "File %s already exists. Overwrite?" % file_name) == 0
+                overwrite = (
+                    JOptionPane.showConfirmDialog(
+                        self._typedef_tab._component,
+                        "File %s already exists. Overwrite?" % file_name,
+                    )
+                    == 0
+                )
                 if not overwrite:
                     return
                 print("overwriting file: %s" % file_name)
             try:
-                blackboxprotobuf.export_protofile(blackboxprotobuf.known_messages, file_name)
+                blackboxprotobuf.export_protofile(
+                    blackboxprotobuf.known_messages, file_name
+                )
             except Exception as exc:
                 self._typedef_tab._burp_callbacks.printError(traceback.format_exc())
-                JOptionPane.showMessageDialog(self._typedef_tab._component, "Error saving .proto file: " + str(exc))
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    "Error saving .proto file: " + str(exc),
+                )
 
-        elif event.getActionCommand() == 'import-proto':
+        elif event.getActionCommand() == "import-proto":
             chooser = JFileChooser()
-            chooser.setFileFilter(FileNameExtensionFilter("Protobuf Type Definition", ["proto"]))
+            chooser.setFileFilter(
+                FileNameExtensionFilter("Protobuf Type Definition", ["proto"])
+            )
             chooser.setMultiSelectionEnabled(False)
 
             action = chooser.showSaveDialog(self._typedef_tab.getUiComponent())
-            if action == JFileChooser.CANCEL_OPTION or action == JFileChooser.ERROR_OPTION:
+            if (
+                action == JFileChooser.CANCEL_OPTION
+                or action == JFileChooser.ERROR_OPTION
+            ):
                 return
 
             file_name = chooser.getSelectedFile().getCanonicalPath()
             if not os.path.exists(file_name):
-                self._typedef_tab._burp_callbacks.printError("Attempted to import %s, but the file does not exist." % file_name)
-                JOptionPane.showMessageDialog(self._typedef_tab._component, "File %s does not exist to import." + str(exc))
+                self._typedef_tab._burp_callbacks.printError(
+                    "Attempted to import %s, but the file does not exist." % file_name
+                )
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    "File %s does not exist to import." + str(exc),
+                )
                 return
             try:
-                new_typedefs = blackboxprotobuf.import_protofile(file_name, save_to_known=False)
+                new_typedefs = blackboxprotobuf.import_protofile(
+                    file_name, save_to_known=False
+                )
                 for key, value in new_typedefs.items():
                     # check to make sure we don't nuke existing messages
                     if key in blackboxprotobuf.known_messages:
-                        overwrite = JOptionPane.showConfirmDialog(self._typedef_tab._component, "Message %s already saved. Overwrite?" % key) == 0
+                        overwrite = (
+                            JOptionPane.showConfirmDialog(
+                                self._typedef_tab._component,
+                                "Message %s already saved. Overwrite?" % key,
+                            )
+                            == 0
+                        )
                         if not overwrite:
                             continue
                     blackboxprotobuf.known_messages[key] = value
                     self._typedef_tab._extension.known_message_model.addElement(key)
             except Exception as exc:
                 self._typedef_tab._burp_callbacks.printError(traceback.format_exc())
-                JOptionPane.showMessageDialog(self._typedef_tab._component, "Error saving .proto file: " + str(exc))
+                JOptionPane.showMessageDialog(
+                    self._typedef_tab._component,
+                    "Error saving .proto file: " + str(exc),
+                )

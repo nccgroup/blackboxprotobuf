@@ -5,7 +5,11 @@ from hypothesis import given
 import hypothesis.strategies as st
 
 from blackboxprotobuf.lib.types import fixed, varint, length_delim
-from blackboxprotobuf.lib.exceptions import BlackboxProtobufException, DecoderException, EncoderException
+from blackboxprotobuf.lib.exceptions import (
+    BlackboxProtobufException,
+    DecoderException,
+    EncoderException,
+)
 
 # Fixed exception tests
 
@@ -17,6 +21,8 @@ def test_encode_fixed32(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
+
 @given(value=st.integers())
 def test_encode_sfixed32(value):
     try:
@@ -24,7 +30,8 @@ def test_encode_sfixed32(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
-    
+
+
 @given(value=st.decimals())
 def test_encode_float(value):
     try:
@@ -32,6 +39,8 @@ def test_encode_float(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
+
 @given(value=st.integers())
 def test_encode_fixed64(value):
     try:
@@ -39,6 +48,8 @@ def test_encode_fixed64(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
+
 @given(value=st.integers())
 def test_encode_sfixed64(value):
     try:
@@ -46,6 +57,7 @@ def test_encode_sfixed64(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
 
 @given(value=st.decimals())
 def test_encode_double(value):
@@ -55,7 +67,9 @@ def test_encode_double(value):
         assert not isinstance(exc, DecoderException)
         pass
 
+
 ## Decoding
+
 
 @given(buf=st.binary(max_size=100), pos=st.integers(max_value=200))
 def test_decode_fixed32(buf, pos):
@@ -64,6 +78,8 @@ def test_decode_fixed32(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
+
 @given(buf=st.binary(max_size=100), pos=st.integers(max_value=200))
 def test_decode_sfixed32(buf, pos):
     try:
@@ -71,6 +87,8 @@ def test_decode_sfixed32(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
+
 @given(buf=st.binary(max_size=100), pos=st.integers(max_value=200))
 def test_decode_float(buf, pos):
     try:
@@ -78,6 +96,8 @@ def test_decode_float(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
+
 @given(buf=st.binary(max_size=100), pos=st.integers(max_value=200))
 def test_decode_fixed64(buf, pos):
     try:
@@ -85,6 +105,8 @@ def test_decode_fixed64(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
+
 @given(buf=st.binary(max_size=100), pos=st.integers(max_value=200))
 def test_decode_sfixed64(buf, pos):
     try:
@@ -92,6 +114,8 @@ def test_decode_sfixed64(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
+
 @given(buf=st.binary(max_size=100), pos=st.integers(max_value=200))
 def test_decode_double(buf, pos):
     try:
@@ -99,6 +123,7 @@ def test_decode_double(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
 
 # Varint exception tests
 @given(value=st.integers())
@@ -109,6 +134,7 @@ def test_encode_uvarint(value):
         assert not isinstance(exc, DecoderException)
         pass
 
+
 @given(value=st.integers())
 def test_encode_varint(value):
     try:
@@ -116,6 +142,7 @@ def test_encode_varint(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
 
 @given(value=st.integers())
 def test_encode_svarint(value):
@@ -125,6 +152,7 @@ def test_encode_svarint(value):
         assert not isinstance(exc, DecoderException)
         pass
 
+
 @given(buf=st.binary(max_size=32), pos=st.integers(max_value=64))
 def test_decode_uvarint(buf, pos):
     try:
@@ -132,6 +160,7 @@ def test_decode_uvarint(buf, pos):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
 
 @given(buf=st.binary(max_size=32), pos=st.integers(max_value=64))
 def test_decode_varint(buf, pos):
@@ -141,6 +170,7 @@ def test_decode_varint(buf, pos):
         assert not isinstance(exc, EncoderException)
         pass
 
+
 @given(buf=st.binary(max_size=32), pos=st.integers(max_value=64))
 def test_decode_svarint(buf, pos):
     try:
@@ -149,15 +179,18 @@ def test_decode_svarint(buf, pos):
         assert not isinstance(exc, EncoderException)
         pass
 
+
 # length_delim exception tests
+
 
 @given(value=st.binary())
 def encode_bytes(value):
     try:
-        length_delim.encode_bytes(value) 
+        length_delim.encode_bytes(value)
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
 
 @given(value=st.binary(), pos=st.integers(max_value=2000))
 def test_decode_bytes(value, pos):
@@ -167,6 +200,7 @@ def test_decode_bytes(value, pos):
         assert not isinstance(exc, EncoderException)
         pass
 
+
 @given(value=st.binary())
 def test_encode_bytes_hex(value):
     try:
@@ -174,6 +208,7 @@ def test_encode_bytes_hex(value):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, DecoderException)
         pass
+
 
 @given(buf=st.binary(), pos=st.integers(max_value=2000))
 def test_decode_bytes_hex(buf, pos):
@@ -183,6 +218,7 @@ def test_decode_bytes_hex(buf, pos):
         assert not isinstance(exc, EncoderException)
         pass
 
+
 @given(value=st.binary(), pos=st.integers(max_value=2000))
 def test_decode_string(value, pos):
     try:
@@ -191,6 +227,7 @@ def test_decode_string(value, pos):
         assert not isinstance(exc, EncoderException)
         pass
 
+
 @given(buf=st.binary())
 def test_decode_message(buf):
     try:
@@ -198,6 +235,7 @@ def test_decode_message(buf):
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
+
 
 @given(buf=st.binary())
 def test_decode_lendelim_message(buf):

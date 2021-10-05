@@ -11,8 +11,10 @@ from javax.swing import DefaultListModel
 
 
 # Add correct directory to sys.path
-_BASE_DIR = os.path.abspath(os.path.dirname(inspect.getfile(inspect.currentframe())) + '../../../../')
-sys.path.insert(0, _BASE_DIR + '/burp/')
+_BASE_DIR = os.path.abspath(
+    os.path.dirname(inspect.getfile(inspect.currentframe())) + "../../../../"
+)
+sys.path.insert(0, _BASE_DIR + "/burp/")
 
 import blackboxprotobuf
 from blackboxprotobuf.burp import editor, typedef_tab
@@ -20,9 +22,9 @@ from blackboxprotobuf.burp import editor, typedef_tab
 
 EXTENSION_NAME = "BlackboxProtobuf"
 
+
 class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
     """Primary extension class. Sets up all other functionality."""
-
 
     def __init__(self):
         self.callbacks = None
@@ -50,7 +52,9 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
 
             callbacks.setExtensionName(EXTENSION_NAME)
 
-            callbacks.registerMessageEditorTabFactory(editor.ProtoBufEditorTabFactory(self))
+            callbacks.registerMessageEditorTabFactory(
+                editor.ProtoBufEditorTabFactory(self)
+            )
 
             self.suite_tab = typedef_tab.TypeDefinitionTab(self, callbacks)
             callbacks.addSuiteTab(self.suite_tab)
@@ -59,6 +63,7 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
         except Exception as exc:
             self.callbacks.printError(traceback.format_exc())
             raise exc
+
     def loadKnownMessages(self):
         message_json = self.callbacks.loadExtensionSetting("known_messages")
         if message_json:
@@ -69,8 +74,12 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
 
     def saveKnownMessages(self):
         # save the known messages
-        self.callbacks.saveExtensionSetting("known_messages", json.dumps(blackboxprotobuf.known_messages))
-        self.callbacks.saveExtensionSetting("saved_type_map", json.dumps(self.saved_types))
+        self.callbacks.saveExtensionSetting(
+            "known_messages", json.dumps(blackboxprotobuf.known_messages)
+        )
+        self.callbacks.saveExtensionSetting(
+            "saved_type_map", json.dumps(self.saved_types)
+        )
 
     def extensionUnloaded(self):
         # TODO kill any open editor windows
