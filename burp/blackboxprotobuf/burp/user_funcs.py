@@ -65,6 +65,6 @@ def hash_message(
 ):
     """Customize how a request is identified for type definition saving. Two
     requests will use the same type definition if this function returns the
-    same value.
+    same value. Should return a string value.
     """
     pass

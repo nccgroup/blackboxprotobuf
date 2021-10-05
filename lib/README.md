@@ -40,23 +40,25 @@ into a usable form. Users can optionally pass in custom type definitions that
 override the guessed type. Custom type definitions also allow naming of fields to
 improve user friendliness.
 
-## Future Work
-- Allow import and export of type definitions to protobuf definition files.
-
 # Usage
 ## Installation    
 This library depends on internal functions of Google's protobuf Python library
-to do some encoding/decoding of individual fields. This dependency is included
-in `lib-requirements.txt` and can be installed with:
+to do some encoding/decoding of individual fields and six for python 2
+compatibility.
+
+The package can be installed from source with:
 
 ```
-pip install -r lib-requirements.txt
+poetry install
 ```
+
+A package on pypi should be available in the near future.
 
 ## Interface
-The main `blackboxprotobuf` module defines five functions, the core
-encoding/decoding functions, two convenience functions that encode/decode JSON
-strings and a function to validate type definition changes.
+The main `blackboxprotobuf` module defines an API with the core encode/decode
+message functions, along with several convenience functions to make it easier
+to use blackboxprotobuf with a user interface, such as encoding/decoding
+directly to JSON and validating modified type definitions.
 
 ### Decode 
 Decoding functions takes a protobuf bytestring, and optionally
@@ -116,6 +118,49 @@ structure for the inner message. 'message_type_name' should contain the string
 identifier for a message type previously stored in
 `blackboxprotobuf.known_messages`. If both are specified, the 'message_type_name'
 will be ignored.
+
+### JSON Encode/Decode
+
+The `protobuf_to_json` and `protobuf_from_json` functions are convenience
+functions for  encoding/decoding messages to JSON instead of a python
+dictionary. These functions are designed for user-facing input/output and will
+also automatically sort the output, try to encode bytestrings for better
+printing and annotate example values onto the type definition structure.
+
+## Export/import protofile
+
+The `export_protofile` and `import_protofile` will attempt to convert a
+protobuffer `.proto` file into the blackboxprotobuf type definition and vice
+versa. These functions provide a higher level interface to
+`blackboxprotobuf.lib.protofile` which only takes a filename. The protofile
+functions do not implement a full proper parser and may break on some types.
+One common case to be aware of is the "import" statements in ".proto" files,
+which are not supported. Any imported files must be manually imported with
+`import_protofile` and saved in `blackboxprotobuf.known_messages` first.
+
+
+## Validate Typedef
+
+The `validate_typedef` function is designed to sanity check modified type
+definitions and make sure they are internally consistent and consistent with
+the previous type definition (if provided). This should help catch issues such
+as changing a field to an incompatible type or duplicate field names.
+
+## Output Helper Functions
+
+The `json_safe_transform` is a helper function to help create more readable
+JSON output of bytes. It will encode/decode bytes types as `latin1` based on
+the type in the type definition.
+
+The `sort_output` is a helper function which sorts the output message based on
+the field numbers from the typedef. This helps makes the JSON output more
+consistent and predictable.
+
+The `sort_typedef` function sorts the fields of the typedef in order to make
+the output more readable. The message fields are sorted by their number and
+type fields (eg. name, type, inner message typedef) are sorted to prioritize
+important short fields at the top and especially to keep the name and type
+fields from getting buried underneath a long inner typedef.
 
 ## Type Breakdown
 The following is a quick breakdown of wire types and default values. See
