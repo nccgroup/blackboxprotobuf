@@ -1,5 +1,6 @@
 """Methods for easy encoding and decoding of messages"""
 
+import re
 import six
 import json
 import collections
@@ -70,8 +71,9 @@ def import_protofile(input_filename, save_to_known=True):
         blackboxprotobuf.known_messages.update(new_typedefs)
     else:
         return new_typedefs
+        
 
-
+NAME_REGEX = re.compile(r'\A[a-zA-Z][a-zA-Z0-9_.]*\Z')
 def validate_typedef(typedef, old_typedef=None, path=None):
     """Validate the typedef format. Optionally validate wiretype of a field
        number has not been changed
@@ -129,6 +131,10 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                 if value in field_names:
                     raise TypedefException(("Duplicate field name \"%s\" for field "
                                             "number %s") % (value, field_number), field_path)
+                if not NAME_REGEX.match(value):
+                    raise TypedefException(("Invalid field name \"%s\" for field "
+                                            "number %s. Should match %s") %
+                                            (value, field_number, "[a-zA-Z][a-zA-Z0-9_.]*"), field_path)
                 if value != '':
                     field_names.add(value)
 

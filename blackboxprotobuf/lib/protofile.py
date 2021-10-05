@@ -62,7 +62,7 @@ PROTO_FILE_TYPE_TO_BBP= {
     'bytes': default_binary_type
 }
 
-NAME_REGEX = re.compile(r'\A[a-zA-Z][a-zA-Z0-9_]*\Z')
+NAME_REGEX = re.compile(r'\A[a-zA-Z][a-zA-Z0-9_.]*\Z')
 
 # add packed types to the list
 for packable_type in PACKABLE_TYPES:

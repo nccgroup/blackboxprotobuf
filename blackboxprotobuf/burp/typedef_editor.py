@@ -75,12 +75,19 @@ class TypeEditorWindow(JFrame):
 
     def validateType(self):
         """Callback for validate button. Validates the type without saving"""
-        message_type = json.loads(self._type_editor.getText().tostring())
+        try:
+            message_type = json.loads(self._type_editor.getText().tostring())
+        except Exception as exc:
+            self._burp_callbacks.printError(traceback.format_exc())
+            JOptionPane.showMessageDialog(self, "Error decoding JSON: " + str(exc))
+            return
+
         try:
             blackboxprotobuf.validate_typedef(message_type, self._original_typedef)
         except Exception as exc:
             self._burp_callbacks.printError(traceback.format_exc())
             JOptionPane.showMessageDialog(self, "Error validating type: " + str(exc))
+            return
 
 class TypeEditorButtonListener(ActionListener):
     """Button action listener for the type editor window"""
