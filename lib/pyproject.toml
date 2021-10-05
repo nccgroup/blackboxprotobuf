@@ -6,7 +6,7 @@ authors = ["Ryan Winkelmaier <ryan.winkelmaier@nccgroup.com>"]
 license = "MIT"
 repository = "https://github.com/nccgroup/blackboxprotobuf"
 readme = "README.md"
-keywords = "protobuf"
+keywords = ["protobuf"]
 exclude = ["/tests"]
 
 [tool.poetry.dependencies]

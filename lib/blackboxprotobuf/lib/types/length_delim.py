@@ -13,7 +13,6 @@ from blackboxprotobuf.lib.exceptions import (
     EncoderException,
     DecoderException,
     TypedefException,
-    BlackboxProtobufException,
 )
 
 
@@ -267,7 +266,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
             # we already have a type, just map the decoder
             if field_typedef["type"] not in blackboxprotobuf.lib.types.decoders:
                 raise TypedefException(
-                    "Got unkown type % for field_number %"
+                    "Got unkown type %s for field_number %s"
                     % (field_typedef["type"], field_number),
                     path=path,
                 )
@@ -386,9 +385,9 @@ def _get_field_key(field_number, typedef, path):
     if "-" in field_number:
         field_number, alt_field_number = field_number.split("-")
         # TODO
-        raise NotImplemented(
-            "Handling for _get_field_key not implemented for alt typedefs: %"
-            % field_numbe,
+        raise NotImplementedError(
+            "Handling for _get_field_key not implemented for alt typedefs: %s"
+            % field_number,
             path=path,
         )
     if field_number in typedef and "name" in typedef[field_number]:
@@ -479,7 +478,7 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
     except DecoderException as exc:
         # this should be pretty common, don't be noisy or throw an exception
         logging.debug(
-            "Could not decode a buffer for field number % as a message: ",
+            "Could not decode a buffer for field number %s as a message: %s",
             field_key,
             exc,
         )
@@ -510,17 +509,17 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
                     output_typedef_num = str(
                         max([int(i) for i in ["0"] + all_typedefs.keys()]) + 1
                     )
-                    field_typedef["alt_typedefs"][output_typedef_num] = target_typedef
+                    field_typedef["alt_typedefs"][output_typedef_num] = target_type
                 else:
                     output_typedef_num = output_typedef_nums[0]
-                message_output[field_key + "-" + output_tyepdef_num] = (
+                message_output[field_key + "-" + output_typedef_num] = (
                     outputs if len(outputs) > 1 else outputs[0]
                 )
             else:
                 field_typedef["type"] = target_type
                 message_output[field_key] = outputs if len(outputs) > 1 else outputs[0]
             return
-        except DecoderException as exc:
+        except DecoderException:
             continue
 
 

@@ -6,9 +6,7 @@ definition format.
 # TODO get custom exceptions for these methods
 
 import io
-import os
 import re
-import six
 import logging
 from blackboxprotobuf.lib.exceptions import TypedefException
 import blackboxprotobuf.lib.api

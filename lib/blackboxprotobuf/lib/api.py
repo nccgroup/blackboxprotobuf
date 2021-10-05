@@ -268,7 +268,7 @@ def json_safe_transform(values, typedef, toBytes):
                                 "Provided alt field name/number "
                                 "%s is not valid for field_number %s"
                             )
-                            % (alt_field_number, field_number)
+                            % (alt_number, field_number)
                         )
                     values[name] = json_safe_transform(
                         value,
