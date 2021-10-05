@@ -127,7 +127,7 @@ dictionary. These functions are designed for user-facing input/output and will
 also automatically sort the output, try to encode bytestrings for better
 printing and annotate example values onto the type definition structure.
 
-## Export/import protofile
+### Export/import protofile
 
 The `export_protofile` and `import_protofile` will attempt to convert a
 protobuffer `.proto` file into the blackboxprotobuf type definition and vice
@@ -139,14 +139,14 @@ which are not supported. Any imported files must be manually imported with
 `import_protofile` and saved in `blackboxprotobuf.known_messages` first.
 
 
-## Validate Typedef
+### Validate Typedef
 
 The `validate_typedef` function is designed to sanity check modified type
 definitions and make sure they are internally consistent and consistent with
 the previous type definition (if provided). This should help catch issues such
 as changing a field to an incompatible type or duplicate field names.
 
-## Output Helper Functions
+### Output Helper Functions
 
 The `json_safe_transform` is a helper function to help create more readable
 JSON output of bytes. It will encode/decode bytes types as `latin1` based on
@@ -161,6 +161,33 @@ the output more readable. The message fields are sorted by their number and
 type fields (eg. name, type, inner message typedef) are sorted to prioritize
 important short fields at the top and especially to keep the name and type
 fields from getting buried underneath a long inner typedef.
+
+### Config
+
+Many of the functions accept a `config` keyword argument of the
+`blackboxprotobuf.lib.config.Config` class. The config object allows modifying
+some of the encoding/decoding functionality and storing some state. This
+replaces some variables that were global before.
+
+At the moment this includes:
+
+* `known_types` - Mapping of message type names to typedef (previously
+  `blackboxprotobuf.known_messages)
+
+* `default_binary_type` - Change the default type choice for binary fields when
+  decoding previously unknown fields. Defaults to `bytes` but can be set to
+  `bytes_hex` to return a hex encoded string instead. `bytes_base64` might be
+  another option in the future. The type can always be changed for an
+  individual field by changing the `type` in the typedef.
+
+* `default_types` - Change the default type choice for any wiretype when
+  decoding a previously unknown field. For example, to default to unsigned
+  integers for all varints, set `default_types[wire_format.WIRETYPE_VARINT] =
+  'uint'`.
+
+The `api` functions like `blackboxprotobuf.decode_message` will default to
+using the global `blackboxprotobuf.lib.config.default` object if one is not
+specified.
 
 ## Type Breakdown
 The following is a quick breakdown of wire types and default values. See

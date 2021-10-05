@@ -4,6 +4,7 @@ throw some form of BlackboxProtobufException."""
 from hypothesis import given
 import hypothesis.strategies as st
 
+from blackboxprotobuf.lib import config
 from blackboxprotobuf.lib.types import fixed, varint, length_delim
 from blackboxprotobuf.lib.exceptions import (
     BlackboxProtobufException,
@@ -231,7 +232,7 @@ def test_decode_string(value, pos):
 @given(buf=st.binary())
 def test_decode_message(buf):
     try:
-        length_delim.decode_message(buf)
+        length_delim.decode_message(buf, config.Config())
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass
@@ -240,7 +241,7 @@ def test_decode_message(buf):
 @given(buf=st.binary())
 def test_decode_lendelim_message(buf):
     try:
-        length_delim.decode_lendelim_message(buf)
+        length_delim.decode_lendelim_message(buf, config.Config())
     except BlackboxProtobufException as exc:
         assert not isinstance(exc, EncoderException)
         pass

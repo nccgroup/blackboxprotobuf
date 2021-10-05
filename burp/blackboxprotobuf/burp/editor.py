@@ -22,6 +22,7 @@ from java.awt.event import ActionListener
 from javax.swing.border import EmptyBorder
 from blackboxprotobuf.burp import user_funcs
 from blackboxprotobuf.burp import typedef_editor
+from blackboxprotobuf.lib.config import default as default_config
 from blackboxprotobuf.lib.exceptions import (
     BlackboxProtobufException,
     DecoderException,
@@ -159,8 +160,11 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self.message_type_name = None
         if self._message_hash in self._extension.saved_types:
             typename = self._extension.saved_types[self._message_hash]
-            self.message_type_name = typename
-            self.message_type = blackboxprotobuf.known_messages[typename]
+            if typename in default_config.known_types:
+                self.message_type_name = typename
+                self.message_type = default_config.known_types[typename]
+            else:
+                del self._extension.saved_types[self._message_hash]
 
         try:
             protobuf_data = None
@@ -198,8 +202,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         # Bring out of exception handler to avoid nexting handlers
         if not success:
-            if self._message_hash in self._extension.known_types:
-                del self._extension.known_types[self._message_hash]
+            if self._message_hash in self._extension.saved_types:
+                del self._extension.saved_types[self._message_hash]
                 self.setMessage(content, is_request, False)
 
         if self.message_type_name:
@@ -438,11 +442,11 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         type_name = self._type_list_component.getSelectedValue()
         # try to catch none here...
-        if not type_name or type_name not in blackboxprotobuf.known_messages:
+        if not type_name or type_name not in default_config.known_types:
             return
 
         try:
-            self.applyType(blackboxprotobuf.known_messages[type_name])
+            self.applyType(default_config.known_types[type_name])
         except BlackboxProtobufException as exc:
             self._callbacks.printError(traceback.format_exc())
 
@@ -513,14 +517,14 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 "message name. Message names should be alphanumeric." % name,
             )
             return
-        if name in blackboxprotobuf.known_messages:
+        if name in default_config.known_types:
             JOptionPane.showMessageDialog(
                 self._component, "Message name %s is " "already taken." % name
             )
             return
 
         # Do a deep copy on the dictionary so we don't accidentally modify others
-        blackboxprotobuf.known_messages[name] = copy.deepcopy(self.message_type)
+        default_config.known_types[name] = copy.deepcopy(self.message_type)
         # update the list of messages. This should trickle down to known message model
         self._extension.known_message_model.addElement(name)
         self._new_type_field.setText("")
@@ -682,9 +686,9 @@ class FilteredMessageModel(ListModel, ListDataListener):
         # if we don't have data yet, just quit early
         if not self._data:
             return False
-        if typename not in blackboxprotobuf.known_messages:
+        if typename not in default_config.known_types:
             return False
-        typedef = blackboxprotobuf.known_messages[typename]
+        typedef = default_config.known_types[typename]
         try:
             _, _ = blackboxprotobuf.protobuf_to_json(self._data, typedef)
         except BlackboxProtobufException as exc:

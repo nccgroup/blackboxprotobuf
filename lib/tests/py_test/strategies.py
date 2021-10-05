@@ -25,7 +25,7 @@ def message_typedef_gen(draw, max_depth=3):
         field_name = str(field_number)
         message_types = [
             field_type
-            for field_type in type_maps.wiretypes.keys()
+            for field_type in type_maps.WIRETYPES.keys()
             if field_type in input_map and input_map[field_type] is not None
         ]
         if max_depth == 0:

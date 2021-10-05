@@ -7,38 +7,45 @@ import collections
 import blackboxprotobuf.lib.protofile
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
+import blackboxprotobuf.lib.config
 from blackboxprotobuf.lib.exceptions import TypedefException
 
-blackboxprotobuf.known_messages = {}
 
-
-def decode_message(buf, message_type=None):
+def decode_message(buf, message_type=None, config=None):
     """Decode a message to a Python dictionary.
     Returns tuple of (values, types)
     """
+
+    if config is None:
+        config = blackboxprotobuf.lib.config.default
 
     if isinstance(buf, bytearray):
         buf = bytes(buf)
     buf = six.ensure_binary(buf)
     if message_type is None or isinstance(message_type, str):
-        if message_type not in blackboxprotobuf.known_messages:
+        if message_type not in config.known_types:
             message_type = {}
         else:
-            message_type = blackboxprotobuf.known_messages[message_type]
+            message_type = config.known_types[message_type]
 
     value, typedef, _ = blackboxprotobuf.lib.types.length_delim.decode_message(
-        buf, message_type
+        buf, config, message_type
     )
     return value, typedef
 
 
 # TODO add explicit validation of values to message type
-def encode_message(value, message_type):
+def encode_message(value, message_type, config=None):
     """Encodes a python dictionary to a message.
     Returns a bytearray
     """
+
+    if config is None:
+        config = blackboxprotobuf.lib.config.default
     return bytes(
-        blackboxprotobuf.lib.types.length_delim.encode_message(value, message_type)
+        blackboxprotobuf.lib.types.length_delim.encode_message(
+            value, config, message_type
+        )
     )
 
 
@@ -47,8 +54,10 @@ def protobuf_to_json(*args, **kwargs):
     Takes same arguments as decode_message
     """
     value, message_type = decode_message(*args, **kwargs)
-    value = json_safe_transform(value, message_type, False)
-    value = sort_output(value, message_type)
+    value = json_safe_transform(
+        value, message_type, False, config=kwargs.get("cofnig", None)
+    )
+    value = sort_output(value, message_type, config=kwargs.get("config", None))
     _annotate_typedef(message_type, value)
     message_type = sort_typedef(message_type)
     return json.dumps(value, indent=2), message_type
@@ -74,15 +83,18 @@ def export_protofile(message_types, output_filename):
     )
 
 
-def import_protofile(input_filename, save_to_known=True):
+def import_protofile(input_filename, save_to_known=True, config=None):
     """import ".proto" files and returns the typedef map
     Expects a filename for the ".proto" file
     """
+    if config is None:
+        config = blackboxprotobuf.lib.config.default
+
     new_typedefs = blackboxprotobuf.lib.protofile.import_proto(
         input_filename=input_filename
     )
     if save_to_known:
-        blackboxprotobuf.known_messages.update(new_typedefs)
+        config.known_types.update(new_typedefs)
     else:
         return new_typedefs
 
@@ -90,12 +102,15 @@ def import_protofile(input_filename, save_to_known=True):
 NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
 
 
-def validate_typedef(typedef, old_typedef=None, path=None):
+def validate_typedef(typedef, old_typedef=None, path=None, config=None):
     """Validate the typedef format. Optionally validate wiretype of a field
     number has not been changed
     """
     if path is None:
         path = []
+    if config is None:
+        config = blackboxprotobuf.lib.config.default
+
     int_keys = set()
     field_names = set()
     for field_number, field_typedef in typedef.items():
@@ -163,7 +178,7 @@ def validate_typedef(typedef, old_typedef=None, path=None):
 
             # Validate type value
             if key == "type":
-                if value not in blackboxprotobuf.lib.types.type_maps.wiretypes:
+                if value not in blackboxprotobuf.lib.types.type_maps.WIRETYPES:
                     raise TypedefException(
                         'Invalid type "%s" for field number %s' % (value, field_number),
                         field_path,
@@ -190,20 +205,20 @@ def validate_typedef(typedef, old_typedef=None, path=None):
 
             # Check if message type name is known
             if key == "message_type_name":
-                if value not in blackboxprotobuf.known_messages:
+                if value not in config.known_types:
                     raise TypedefException(
                         (
                             'Message type "%s" for field number'
                             " %s is not known. Known types: %s"
                         )
-                        % (value, field_number, blackboxprotobuf.known_messages.keys()),
+                        % (value, field_number, config.known_types.keys()),
                         field_path,
                     )
 
             # Recursively validate inner typedefs
             if key in ["message_typedef", "group_typedef"]:
                 if old_typedef is None:
-                    validate_typedef(value, path=field_path)
+                    validate_typedef(value, path=field_path, config=config)
                 else:
                     # print(old_typedef.keys())
                     validate_typedef(
@@ -212,14 +227,14 @@ def validate_typedef(typedef, old_typedef=None, path=None):
             if key == "alt_typedefs":
                 for alt_field_number, alt_typedef in value.items():
                     # TODO validate alt_typedefs against old typedefs?
-                    validate_typedef(alt_typedef, path=field_path)
+                    validate_typedef(alt_typedef, path=field_path, config=config)
 
     if old_typedef is not None:
         wiretype_map = {}
         for field_number, value in old_typedef.items():
             wiretype_map[
                 int(field_number)
-            ] = blackboxprotobuf.lib.types.type_maps.wiretypes[value["type"]]
+            ] = blackboxprotobuf.lib.types.type_maps.WIRETYPES[value["type"]]
         for field_number, value in typedef.items():
             field_path = path[:]
             field_path.append(str(field_number))
@@ -227,7 +242,7 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                 old_wiretype = wiretype_map[int(field_number)]
                 if (
                     old_wiretype
-                    != blackboxprotobuf.lib.types.type_maps.wiretypes[value["type"]]
+                    != blackboxprotobuf.lib.types.type_maps.WIRETYPES[value["type"]]
                 ):
                     raise TypedefException(
                         (
@@ -239,10 +254,12 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                     )
 
 
-def json_safe_transform(values, typedef, toBytes):
+def json_safe_transform(values, typedef, toBytes, config=None):
     """JSON doesn't handle bytes type well. We want to go through and encode
     every bytes type as latin1 to get a semi readable text"""
 
+    if config is None:
+        config = blackboxprotobuf.lib.config.default
     name_map = {
         item["name"]: number
         for number, item in typedef.items()
@@ -277,33 +294,37 @@ def json_safe_transform(values, typedef, toBytes):
                     )
                 else:
                     values[name] = json_safe_transform(
-                        value, _get_typedef_for_message(typedef[field_number]), toBytes
+                        value,
+                        _get_typedef_for_message(typedef[field_number], config),
+                        toBytes,
                     )
 
     return values
 
 
-def _get_typedef_for_message(field_typedef):
+def _get_typedef_for_message(field_typedef, config):
     assert field_typedef["type"] == "message"
     if "message_typedef" in field_typedef:
         return field_typedef["message_typedef"]
     elif field_typedef.get("message_type_name"):
-        if field_typedef["message_type_name"] not in blackboxprotobuf.known_messages:
+        if field_typedef["message_type_name"] not in config.known_types:
             raise TypedefException(
                 "Got 'message_type_name' not in known_messages: %s"
                 % field_typedef["message_type_name"]
             )
-        return blackboxprotobuf.known_messages[field_typedef["message_type_name"]]
+        return config.known_types[field_typedef["message_type_name"]]
     else:
         raise TypedefException(
             "Got 'message' type without typedef or type name: %s" % field_typedef
         )
 
 
-def sort_output(value, typedef):
+def sort_output(value, typedef, config=None):
     """Sort output by the field number in the typedef. Helps with readability
     in a JSON dump"""
     output_dict = collections.OrderedDict()
+    if config is None:
+        config = blackboxprotobuf.lib.config.default
 
     for field_number, field_def in sorted(typedef.items(), key=lambda t: int(t[0])):
         field_name = str(field_number)
@@ -313,7 +334,7 @@ def sort_output(value, typedef):
         if field_name in value:
             if field_def["type"] == "message":
                 output_dict[field_name] = sort_output(
-                    value[field_name], _get_typedef_for_message(field_def)
+                    value[field_name], _get_typedef_for_message(field_def, config)
                 )
             else:
                 output_dict[field_name] = value[field_name]

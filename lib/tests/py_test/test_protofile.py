@@ -18,6 +18,7 @@ import strategies
 import blackboxprotobuf.lib
 import blackboxprotobuf.lib.protofile as protofile
 from blackboxprotobuf.lib.types import length_delim
+from blackboxprotobuf.lib.config import Config
 
 
 to_suppress = []
@@ -58,6 +59,7 @@ def test_proto_export(tmp_path, typedef, name):
 def test_proto_export_inverse(tmp_path, x, name):
     """Generate a proto file and try to re-import it. This does not cover all
     possible proto files we want to try importing"""
+    config = Config()
     typedef, message = x
     with tempfile.NamedTemporaryFile(
         mode="r+", dir=str(tmp_path), suffix=".proto", delete=True
@@ -69,12 +71,12 @@ def test_proto_export_inverse(tmp_path, x, name):
         outfile.flush()
 
         outfile.seek(0)
-        new_typedef_map = protofile.import_proto(input_file=outfile)
+        new_typedef_map = protofile.import_proto(config, input_file=outfile)
 
-        blackboxprotobuf.known_messages.update(new_typedef_map)
+        config.known_types.update(new_typedef_map)
         # validate
         for name, typedef in new_typedef_map.items():
-            blackboxprotobuf.validate_typedef(typedef)
+            blackboxprotobuf.validate_typedef(typedef, config=config)
 
         def _check_field_types(typedef1, typedef2):
             for field_num in typedef1.keys():
@@ -110,41 +112,42 @@ def test_proto_export_inverse(tmp_path, x, name):
 
         note(new_typedef_map[name])
         # try to actually encode a message with the typedef
-        encode_forward = length_delim.encode_message(message, typedef_map[name])
+        encode_forward = length_delim.encode_message(message, config, typedef_map[name])
 
-        blackboxprotobuf.known_messages = new_typedef_map
-        encode_backward = length_delim.encode_message(message, new_typedef_map[name])
+        config.known_types = new_typedef_map
+        encode_backward = length_delim.encode_message(
+            message, config, new_typedef_map[name]
+        )
 
         decode_forward, _, _ = length_delim.decode_message(
-            encode_forward, new_typedef_map[name]
+            encode_forward, config, new_typedef_map[name]
         )
         decode_backward, _, _ = length_delim.decode_message(
-            encode_backward, typedef_map[name]
+            encode_backward, config, typedef_map[name]
         )
-
-        # reset for other tests
-        blackboxprotobuf.known_messages = {}
 
 
 @pytest.mark.filterwarnings("ignore:Call to deprecated create function.*")
 def test_proto_import_examples():
+    config = Config()
     # try importing all the examples pulled from protobuf repo
     protofiles = glob.glob("tests/payloads/test_protos/*.proto")
     os.system("pwd")
     assert len(protofiles) != 0
     for target_file in protofiles:
         print("Testing file: %s" % target_file)
-        typedef_map_out = protofile.import_proto(input_filename=target_file)
-        blackboxprotobuf.known_messages = typedef_map_out
+        typedef_map_out = protofile.import_proto(config, input_filename=target_file)
+        config.known_types = typedef_map_out
         for name, typedef in typedef_map_out.items():
-            logging.debug("known messages: %s" % blackboxprotobuf.known_messages)
-            blackboxprotobuf.lib.validate_typedef(typedef)
+            logging.debug("known messages: %s" % config.known_types)
+            blackboxprotobuf.lib.validate_typedef(typedef, config=config)
 
 
 @given(x=strategies.gen_message(), name=st.from_regex(protofile.NAME_REGEX))
 @settings(suppress_health_check=to_suppress)
 @pytest.mark.filterwarnings("ignore:Call to deprecated create function.*")
 def test_proto_decode(tmp_path, x, name):
+    config = Config()
     typedef, message = x
     """ Export to protobuf and try to decoe a message we encodedd with it """
     with tempfile.NamedTemporaryFile(
@@ -152,7 +155,7 @@ def test_proto_decode(tmp_path, x, name):
     ) as outfile:
         typedef_map = {name: typedef}
 
-        encoded_message = length_delim.encode_message(message, typedef)
+        encoded_message = length_delim.encode_message(message, config, typedef)
 
         note(typedef_map)
         basename = os.path.basename(outfile.name)

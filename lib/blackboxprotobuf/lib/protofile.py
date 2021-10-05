@@ -10,7 +10,6 @@ import re
 import logging
 from blackboxprotobuf.lib.exceptions import TypedefException
 import blackboxprotobuf.lib.api
-from blackboxprotobuf.lib.types import default_binary_type
 
 PROTO_FILE_TYPE_MAP = {
     "uint": "uint64",
@@ -55,9 +54,8 @@ PROTO_FILE_TYPE_TO_BBP = {
     "sfixed64": "sfixed64",
     "bool": "uint",
     "string": "string",
-    # should be blackboxprotobuf.lib.type.default_binary_type
-    # but that creates a circular import?
-    "bytes": default_binary_type,
+    # should be default_binary_type, but can't handle that well here
+    "bytes": "bytes",
 }
 
 NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
@@ -183,7 +181,7 @@ ENUM_REGEX = re.compile(r"^ *enum +([a-zA-Z0-9_]+) *{.*")
 PACKAGE_REGEX = re.compile(r"^ *package +([a-zA-Z0-9_.]+) *;.*")
 
 
-def import_proto(input_string=None, input_filename=None, input_file=None):
+def import_proto(config, input_string=None, input_filename=None, input_file=None):
     typedef_map = {}
     if input_string is not None:
         input_file = io.StringIO(input_string)
@@ -242,6 +240,7 @@ def import_proto(input_string=None, input_filename=None, input_file=None):
             enum_names,
             package_prefix,
             syntax_version == "proto3",
+            config,
         )
 
     return typedef_map
@@ -307,7 +306,7 @@ def _collect_names(prefix, message_tree):
     return message_names, enum_names
 
 
-def _check_message_name(current_path, name, known_message_names):
+def _check_message_name(current_path, name, known_message_names, config):
     # Verify message name against preparsed message names and global
     # known_messages
     # For example, if we have:
@@ -318,7 +317,7 @@ def _check_message_name(current_path, name, known_message_names):
     # PackageA.Message2.Message.InnerMessage
     # PackageA.Message.InnerMessage
     # should also work for enums
-    if name in blackboxprotobuf.known_messages:
+    if name in config.known_types:
         return True
     # search for anything under a common prefix in known_message_names
     logging.debug("Testing message name: %s", name)
@@ -347,7 +346,7 @@ def _check_message_name(current_path, name, known_message_names):
 
 
 def _parse_message(
-    message_tree, typdef_map, known_message_names, enum_names, prefix, is_proto3
+    message_tree, typdef_map, known_message_names, enum_names, prefix, is_proto3, config
 ):
     message_typedef = {}
     message_name = prefix + message_tree["name"]
@@ -361,7 +360,7 @@ def _parse_message(
         match = FIELD_REGEX.match(line)
         if match:
             field_number, field_typedef = _parse_field(
-                match, known_message_names, enum_names, prefix, is_proto3
+                match, known_message_names, enum_names, prefix, is_proto3, config
             )
             message_typedef[field_number] = field_typedef
 
@@ -378,11 +377,12 @@ def _parse_message(
             enum_names,
             prefix,
             is_proto3,
+            config,
         )
 
 
 # parse a field into a dictionary for the typedef
-def _parse_field(match, known_message_names, enum_names, prefix, is_proto3):
+def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, config):
     typedef = {}
 
     field_name = match.group(3)
@@ -408,12 +408,14 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3):
     if not bbp_type:
         logging.debug("Got non-basic type: %s, checking enums", field_type)
         # check enum names
-        if _check_message_name(prefix, field_type, enum_names):
+        if _check_message_name(prefix, field_type, enum_names, config):
             # enum = uint
             bbp_type = "uint"
     if not bbp_type:
         # Not enum or normal type, check messages
-        message_name = _check_message_name(prefix, field_type, known_message_names)
+        message_name = _check_message_name(
+            prefix, field_type, known_message_names, config
+        )
         if message_name:
             bbp_type = "message"
             typedef["message_type_name"] = message_name

@@ -15,6 +15,7 @@ from java.awt import Component, Dimension
 from java.awt.event import ActionListener
 from javax.swing.border import EmptyBorder
 from blackboxprotobuf.lib.api import sort_typedef
+from blackboxprotobuf.lib.config import default as default_config
 
 from blackboxprotobuf.burp import typedef_editor
 
@@ -122,10 +123,10 @@ class TypeDefinitionTab(burp.ITab):
 
         def save_callback(typedef):
             """Save typedef and update list for a given message name"""
-            if name not in blackboxprotobuf.known_messages:
+            if name not in default_config.known_types:
                 self._extension.known_message_model.addElement(name)
 
-            blackboxprotobuf.known_messages[name] = typedef
+            default_config.known_types[name] = typedef
 
         return save_callback
 
@@ -133,7 +134,7 @@ class TypeDefinitionTab(burp.ITab):
         type_name = JOptionPane.showInputDialog("Enter new name")
 
         # Error out if already defined
-        if type_name in blackboxprotobuf.known_messages:
+        if type_name in default_config.known_types:
             JOptionPane.showMessageDialog(
                 self._component,
                 'Message type "%s" already exists' % type_name,
@@ -148,7 +149,7 @@ class TypeDefinitionTab(burp.ITab):
             return
 
         type_name = list_component.getSelectedValue()
-        message_type = blackboxprotobuf.known_messages[type_name]
+        message_type = default_config.known_types[type_name]
 
         self._extension.open_typedef_editor(
             sort_typedef(message_type), self.create_save_callback(type_name)
@@ -180,13 +181,13 @@ class TypeDefinitionButtonListener(ActionListener):
             new_type_name = JOptionPane.showInputDialog(
                 "Enter new name for %s:" % previous_type_name
             )
-            if new_type_name in blackboxprotobuf.known_messages:
+            if new_type_name in default_config.known_types:
                 JOptionPane.showMessageDialog(
                     self._typedef_tab._component,
                     'Message type "%s" already exists' % new_type_name,
                 )
                 return
-            if previous_type_name not in blackboxprotobuf.known_messages:
+            if previous_type_name not in default_config.known_types:
                 JOptionPane.showMessageDialog(
                     self._typedef_tab._component,
                     'Message type "%s" does not exist' % previous_type_name,
@@ -198,9 +199,9 @@ class TypeDefinitionButtonListener(ActionListener):
                     'Message type name "%s" is not valid.' % new_type_name,
                 )
                 return
-            typedef = blackboxprotobuf.known_messages[previous_type_name]
-            blackboxprotobuf.known_messages[new_type_name] = typedef
-            del blackboxprotobuf.known_messages[previous_type_name]
+            typedef = default_config.known_types[previous_type_name]
+            default_config.known_types[new_type_name] = typedef
+            del default_config.known_types[previous_type_name]
             # TODO should manage this centrally somewhere
             self._typedef_tab._extension.refresh_message_model()
             for key, typename in self._typedef_tab._extension.saved_types.items():
@@ -216,7 +217,7 @@ class TypeDefinitionButtonListener(ActionListener):
             type_names = list_component.getSelectedValuesList()
             # TODO Confirm delete?
             for type_name in type_names:
-                del blackboxprotobuf.known_messages[type_name]
+                del default_config.known_types[type_name]
             self._typedef_tab._extension.refresh_message_model()
 
         elif event.getActionCommand() == "save-types":
@@ -241,7 +242,7 @@ class TypeDefinitionButtonListener(ActionListener):
 
             with open(file_name, "w+") as selected_file:
                 json.dump(
-                    blackboxprotobuf.known_messages,
+                    default_config.known_types,
                     selected_file,
                     indent=4,
                     sort_keys=True,
@@ -267,7 +268,7 @@ class TypeDefinitionButtonListener(ActionListener):
                 types = json.load(selected_file)
             for key, value in types.items():
                 # check to make sure we don't nuke existing messages
-                if key in blackboxprotobuf.known_messages:
+                if key in default_config.known_types:
                     overwrite = (
                         JOptionPane.showConfirmDialog(
                             self._typedef_tab._component,
@@ -277,7 +278,7 @@ class TypeDefinitionButtonListener(ActionListener):
                     )
                     if not overwrite:
                         continue
-                blackboxprotobuf.known_messages[key] = value
+                default_config.known_types[key] = value
             self._typedef_tab._extension.refresh_message_model()
         elif event.getActionCommand() == "export-proto":
             chooser = JFileChooser()
@@ -312,9 +313,7 @@ class TypeDefinitionButtonListener(ActionListener):
                     return
                 print("overwriting file: %s" % file_name)
             try:
-                blackboxprotobuf.export_protofile(
-                    blackboxprotobuf.known_messages, file_name
-                )
+                blackboxprotobuf.export_protofile(default_config.known_types, file_name)
             except Exception as exc:
                 self._typedef_tab._burp_callbacks.printError(traceback.format_exc())
                 JOptionPane.showMessageDialog(
@@ -352,7 +351,7 @@ class TypeDefinitionButtonListener(ActionListener):
                 )
                 for key, value in new_typedefs.items():
                     # check to make sure we don't nuke existing messages
-                    if key in blackboxprotobuf.known_messages:
+                    if key in default_config.known_types:
                         overwrite = (
                             JOptionPane.showConfirmDialog(
                                 self._typedef_tab._component,
@@ -362,7 +361,7 @@ class TypeDefinitionButtonListener(ActionListener):
                         )
                         if not overwrite:
                             continue
-                    blackboxprotobuf.known_messages[key] = value
+                    default_config.known_types[key] = value
                     self._typedef_tab._extension.known_message_model.addElement(key)
             except Exception as exc:
                 self._typedef_tab._burp_callbacks.printError(traceback.format_exc())

@@ -17,6 +17,7 @@ _BASE_DIR = os.path.abspath(
 sys.path.insert(0, _BASE_DIR + "/burp/")
 
 import blackboxprotobuf
+from blackboxprotobuf.lib.config import default as default_config
 from blackboxprotobuf.burp import editor, typedef_tab, typedef_editor
 
 
@@ -40,7 +41,7 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
 
     def refresh_message_model(self):
         self.known_message_model.clear()
-        for name in blackboxprotobuf.known_messages.keys():
+        for name in default_config.known_types.keys():
             self.known_message_model.addElement(name)
 
     def registerExtenderCallbacks(self, callbacks):
@@ -66,9 +67,9 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
             raise exc
 
     def loadKnownMessages(self):
-        message_json = self.callbacks.loadExtensionSetting("known_messages")
+        message_json = self.callbacks.loadExtensionSetting("known_types")
         if message_json:
-            blackboxprotobuf.known_messages.update(json.loads(message_json))
+            default_config.known_types.update(json.loads(message_json))
         saved_types = self.callbacks.loadExtensionSetting("saved_type_map")
         if saved_types:
             self.saved_types.update(json.loads(saved_types))
@@ -77,7 +78,7 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
         # TODO might be good to cll this more often (eg. when messages are updated)
         # save the known messages
         self.callbacks.saveExtensionSetting(
-            "known_messages", json.dumps(blackboxprotobuf.known_messages)
+            "known_types", json.dumps(default_config.known_types)
         )
         self.callbacks.saveExtensionSetting(
             "saved_type_map", json.dumps(self.saved_types)
