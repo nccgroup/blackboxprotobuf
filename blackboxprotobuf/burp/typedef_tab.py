@@ -8,11 +8,14 @@ import json
 import burp
 import traceback
 import blackboxprotobuf
-from javax.swing import JSplitPane, JScrollPane, JPanel, JButton, BoxLayout
+from javax.swing import JSplitPane, JScrollPane, JPanel, JButton, BoxLayout, Box
 from javax.swing import JOptionPane, JList, ListSelectionModel, JFileChooser
 from javax.swing.filechooser import FileNameExtensionFilter
-from java.awt import Component
+from java.awt import Component, Dimension
 from java.awt.event import ActionListener
+from javax.swing.border import EmptyBorder
+from blackboxprotobuf.lib.interface import _sort_typedef
+
 from blackboxprotobuf.burp import typedef_editor
 
 class TypeDefinitionTab(burp.ITab):
@@ -22,12 +25,21 @@ class TypeDefinitionTab(burp.ITab):
         self._burp_callbacks = burp_callbacks
 
         self._type_list_component = JList(blackboxprotobuf.known_messages.keys())
-        self._type_list_component.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+        self._type_list_component.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
 
-        self._component = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
-        self._component.setLeftComponent(JScrollPane(self._type_list_component))
-        self._component.setRightComponent(self.createButtonPane())
-        self._component.setResizeWeight(0.9)
+        self._component = JPanel()
+        self._component.setLayout(BoxLayout(self._component, BoxLayout.Y_AXIS))
+
+        splitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
+        splitPane.setRightComponent(JScrollPane(self._type_list_component))
+        splitPane.setLeftComponent(self.createButtonPane())
+        splitPane.setResizeWeight(0.03)
+        splitPane.setMaximumSize(Dimension(1000 ,1000));
+
+        self._component.add(splitPane)
+        self._component.add(Box.createVerticalGlue())
+        self._component.setBorder(EmptyBorder(10, 10, 10, 10))
+
 
     def getTabCaption(self):
         """Returns name on tab"""
@@ -44,13 +56,21 @@ class TypeDefinitionTab(burp.ITab):
         panel = JPanel()
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
 
-        panel.add(self.createButton("New Type", "new-type"))
-        panel.add(self.createButton("Edit Type", "edit-type"))
-        panel.add(self.createButton("Delete Type", "delete-type"))
+        panel.add(Box.createRigidArea(Dimension(0, 5)))
+        panel.add(self.createButton("Add", "new-type"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
+        panel.add(self.createButton("Edit", "edit-type"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
+        panel.add(self.createButton("Remove", "delete-type"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Save All Types To File", "save-types"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Load All Types From File", "load-types"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Export All types As .proto", "export-proto"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Import .proto", "import-proto"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         return panel
 
     def createButton(self, text, command):
@@ -89,7 +109,7 @@ class TypeDefinitionButtonListener(ActionListener):
             # Error out if already defined
             if type_name in blackboxprotobuf.known_messages:
                 JOptionPane.showMessageDialog(self._typedef_tab._component,
-                                              "Message type %s already exists" % type_name)
+                                              "Message type \"%s\" already exists" % type_name)
                 return
 
             typedef_editor.TypeEditorWindow(self._typedef_tab._burp_callbacks,
@@ -101,9 +121,10 @@ class TypeDefinitionButtonListener(ActionListener):
             if list_component.isSelectionEmpty():
                 return
 
+            # Get's only the first value
             type_name = list_component.getSelectedValue()
             typedef_editor.TypeEditorWindow(self._typedef_tab._burp_callbacks,
-                                            blackboxprotobuf._sort_typedef(blackboxprotobuf.known_messages[type_name]),
+                                            _sort_typedef(blackboxprotobuf.known_messages[type_name]),
                                             self.create_save_callback(type_name)).show()
 
         elif event.getActionCommand() == "delete-type":
@@ -112,9 +133,10 @@ class TypeDefinitionButtonListener(ActionListener):
             if list_component.isSelectionEmpty():
                 return
 
-            type_name = list_component.getSelectedValue()
+            type_names = list_component.getSelectedValuesList()
             #TODO Confirm delete?
-            del blackboxprotobuf.known_messages[type_name]
+            for type_name in type_names:
+                del blackboxprotobuf.known_messages[type_name]
             self._typedef_tab.updateList()
 
         elif event.getActionCommand() == 'save-types':
