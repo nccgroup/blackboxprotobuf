@@ -91,7 +91,7 @@ def import_protofile(input_filename, save_to_known=True, config=None):
         config = blackboxprotobuf.lib.config.default
 
     new_typedefs = blackboxprotobuf.lib.protofile.import_proto(
-        input_filename=input_filename
+        config, input_filename=input_filename
     )
     if save_to_known:
         config.known_types.update(new_typedefs)
