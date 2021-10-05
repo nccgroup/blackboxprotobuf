@@ -352,7 +352,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
             content_info = self._content_info if self._is_request else self._request_content_info
             url = content_info.getUrl().getPath()
-            message_hash = (url, self._is_request)
+            message_hash = ':'.join([url, str(self._is_request)])
         return message_hash
 
 
