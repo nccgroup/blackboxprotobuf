@@ -55,6 +55,7 @@ def validate_typedef(typedef, old_typedef=None, path=None):
     if path is None:
         path = []
     int_keys = set()
+    field_names = set()
     for field_number, field_typedef in typedef.items():
         alt_field_number = None
         if '-' in str(field_number):
@@ -82,7 +83,6 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                     "Alt field number (%s) specified for non-message field: %s"
                     % (alt_field_number, field_number), field_path)
 
-        field_names = set()
         valid_type_fields = ["type", "name", "message_typedef",
                              "message_type_name", "group_typedef",
                              "alt_typedefs"]
@@ -105,7 +105,8 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                 if value in field_names:
                     raise TypedefException(("Duplicate field name \"%s\" for field "
                                             "number %s") % (value, field_number), field_path)
-                field_names.add(value)
+                if value != '':
+                    field_names.add(value)
 
             # Check if message type name is known
             if key == "message_type_name":
