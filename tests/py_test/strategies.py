@@ -14,20 +14,25 @@ def message_typedef_gen(draw, max_depth=3):
     output = {}
     field_numbers = draw(st.lists(st.integers(min_value=1, max_value=2000).map(str), min_size=1))
     for field_number in field_numbers:
+        field_name = str(field_number)
         message_types = [ field_type for field_type in type_maps.wiretypes.keys() if field_type in input_map and input_map[field_type] is not None ]
         if max_depth == 0:
             message_types.remove('message')
         field_type = draw(st.sampled_from(message_types))
-        output[field_number] = {}
-        output[field_number]['type'] = field_type
+        output[field_name] = {}
+        output[field_name]['type'] = field_type
+        if not field_type.startswith('packed'):
+            output[field_name]['seen_repeated'] = draw(st.booleans())
         if field_type == 'message':
             output[field_number]['message_typedef'] = draw(message_typedef_gen(max_depth=max_depth-1))
+        #TODO give the field a name
+
     return output
 
 @st.composite
 def gen_message_data(draw, type_def):
     output = {}
-    for number,field in type_def.items():
+    for number, field in type_def.items():
         if 'name' in field and field['name'] != "":
             field_label = field["name"]
         else:
@@ -38,7 +43,10 @@ def gen_message_data(draw, type_def):
         if field_type == 'message':
             output[field_label] = draw(gen_message_data(field['message_typedef']))
         else:
-            output[field_label] = draw(strat)
+            if field.get('seen_repeated', False) and not field_type.startswith('packed'):
+                output[field_label] = draw(st.lists(strat, min_size=2))
+            else:
+                output[field_label] = draw(strat)
     return output
 
 @st.composite
@@ -64,14 +72,14 @@ input_map = {
     'group': None
 }
 input_map.update({
-    'packed_uint': st.lists(input_map['uint']),
-    'packed_int': st.lists(input_map['int']),
-    'packed_sint':st.lists(input_map['sint']),
-    'packed_fixed32': st.lists(input_map['fixed32']),
-    'packed_sfixed32': st.lists(input_map['sfixed32']),
-    'packed_float': st.lists(input_map['float']),
-    'packed_fixed64': st.lists(input_map['fixed64']),
-    'packed_sfixed64': st.lists(input_map['sfixed64']),
-    'packed_double': st.lists(input_map['double']),
+    'packed_uint': st.lists(input_map['uint'], min_size=1),
+    'packed_int': st.lists(input_map['int'], min_size=1),
+    'packed_sint':st.lists(input_map['sint'], min_size=1),
+    'packed_fixed32': st.lists(input_map['fixed32'], min_size=1),
+    'packed_sfixed32': st.lists(input_map['sfixed32'], min_size=1),
+    'packed_float': st.lists(input_map['float'], min_size=1),
+    'packed_fixed64': st.lists(input_map['fixed64'], min_size=1),
+    'packed_sfixed64': st.lists(input_map['sfixed64'], min_size=1),
+    'packed_double': st.lists(input_map['double'], min_size=1),
 })
 

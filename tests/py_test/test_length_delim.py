@@ -1,4 +1,4 @@
-from hypothesis import given,assume,note
+from hypothesis import given, assume, note, example
 import hypothesis.strategies as st
 import strategies
 import six
@@ -25,17 +25,20 @@ def test_bytes_inverse(x):
 # Inverse checks. Ensure a value encoded by bbp decodes to the same value
 @given(x=strategies.input_map['bytes'])
 def test_bytes_guess_inverse(x):
-    encoded = length_delim.encode_bytes(x)
-    value, decoded_type = length_delim.decode_guess(encoded,0)
+    # wrap the message in a new message so that it's a guess inside
+    wrapper_typedef = {'1': {'type':'bytes'}}
+    wrapper_message = {'1': x}
+
+    encoded = length_delim.encode_lendelim_message(wrapper_message, wrapper_typedef)
+    value, typedef, pos = length_delim.decode_lendelim_message(encoded, {})
 
     # would like to fail if it guesses wrong, but sometimes it might parse as a message
-    assume(decoded_type == type_maps.default_binary_type)
+    assume(typedef['1']['type'] == type_maps.default_binary_type)
 
-    decoded, pos = value
     assert isinstance(encoded, bytearray)
-    assert isinstance(decoded, bytearray)
+    assert isinstance(value['1'], bytearray)
     assert pos == len(encoded)
-    assert decoded == x
+    assert value['1'] == x
 
 @given(x=strategies.input_map['bytes'].map(binascii.hexlify))
 def test_bytes_hex_inverse(x):
@@ -57,26 +60,36 @@ def test_string_inverse(x):
 
 @given(x=strategies.gen_message())
 def test_message_inverse(x):
-    type_def, message = x
-    encoded = length_delim.encode_lendelim_message(message, type_def)
-    decoded, _, pos = length_delim.decode_lendelim_message(encoded, type_def, 0)
+    typedef, message = x
+    encoded = length_delim.encode_lendelim_message(message, typedef)
+    decoded, typedef_out, pos = length_delim.decode_lendelim_message(encoded, typedef, 0)
+    note(encoded)
+    note(typedef)
+    note(typedef_out)
     assert isinstance(encoded, bytearray)
     assert isinstance(decoded, dict)
     assert pos == len(encoded)
     assert message == decoded
 
 @given(x=strategies.gen_message())
+@example(x=({'1': {'seen_repeated': True, 'type': 'string'}}, {'1': [u'', u'0']}))
+@example(x=({'1': {'seen_repeated': False, 'type': 'sfixed32'}, '2': {'seen_repeated': True, 'type': 'string'}}, {'1': 0, '2': [u'0', u'00']}))
 def test_message_guess_inverse(x):
     type_def, message = x
+    # wrap the message in a new message so that it's a guess inside
+    wrapper_typedef = {'1': {'type':'message', 'message_typedef': type_def}}
+    wrapper_message = {'1': message}
 
-    encoded = length_delim.encode_lendelim_message(message, type_def)
-    value, decoded_type = length_delim.decode_guess(encoded, 0)
+    encoded = length_delim.encode_lendelim_message(wrapper_message, wrapper_typedef)
+    note("Encoded length %d" % len(encoded))
+    value, decoded_type, pos = length_delim.decode_lendelim_message(encoded, {})
 
-    assert decoded_type == 'message'
-    decoded, _, pos = value
+    note(value)
+    assert decoded_type['1']['type'] == 'message'
 
     assert isinstance(encoded, bytearray)
-    assert isinstance(decoded, dict)
+    assert isinstance(value, dict)
+    assert isinstance(value['1'], dict)
     assert pos == len(encoded)
 
 @given(x=strategies.input_map['packed_uint'])
