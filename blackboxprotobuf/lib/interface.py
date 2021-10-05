@@ -3,6 +3,7 @@
 import six
 import json
 import collections
+import blackboxprotobuf.lib.protofile
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 from blackboxprotobuf.lib.exceptions import TypedefException
@@ -18,7 +19,7 @@ def decode_message(buf, message_type=None):
         buf = bytes(buf)
     buf = six.ensure_binary(buf)
     if message_type is None or isinstance(message_type, str):
-        if message_type not in known_messages:
+        if message_type not in blackboxprotobuf.known_messages:
             message_type = {}
         else:
             message_type = blackboxprotobuf.known_messages[message_type]
@@ -60,12 +61,16 @@ def export_protofile(message_types, output_filename):
     """
     blackboxprotobuf.lib.protofile.export_proto(message_types, output_filename=output_filename)
 
-def import_protofile(input_filename):
-    """ import ".proto" files into the "known_messages" variables.
+def import_protofile(input_filename, save_to_known=True):
+    """ import ".proto" files and returns the typedef map
         Expects a filename for the ".proto" file
     """
-    imported_types = blackboxprotobuf.lib.protofile.import_proto(input_filename=input_filename)
-    blackboxprotobuf.known_messages.update(imported_types)
+    new_typedefs = blackboxprotobuf.lib.protofile.import_proto(input_filename=input_filename)
+    if save_to_known:
+        blackboxprotobuf.known_messages.update(new_typedefs)
+    else:
+        return new_typedefs
+
 
 def validate_typedef(typedef, old_typedef=None, path=None):
     """Validate the typedef format. Optionally validate wiretype of a field
@@ -162,7 +167,7 @@ def json_safe_transform(values, typedef, toBytes):
     """ JSON doesn't handle bytes type well. We want to go through and encode
     every bytes type as latin1 to get a semi readable text """
 
-    name_map = {item['name']: number for number, item in typedef.items() if item['name'] != ''}
+    name_map = {item['name']: number for number, item in typedef.items() if item.get('name', None)}
     for name, value in values.items():
         alt_number = None
         if '-' in name:
@@ -181,10 +186,22 @@ def json_safe_transform(values, typedef, toBytes):
                         raise TypedefException(('Provided alt field name/number '
                                                '%s is not valid for field_number %s')
                                                % (alt_field_number, field_number))
-                    values[name] = json_safe_encoding(value, typedef[field_number]['alt_typedefs'][alt_number])
+                    values[name] = json_safe_transform(value, typedef[field_number]['alt_typedefs'][alt_number], toBytes)
                 else:
-                    values[name] = json_safe_encoding(value, typdef[field_number]['message_typedef'])
+                    values[name] = json_safe_transform(value, _get_typedef_for_message(typedef[field_number]), toBytes)
+
     return values
+
+def _get_typedef_for_message(field_typedef):
+    assert(field_typedef['type'] == 'message')
+    if 'message_typedef' in field_typedef:
+        return field_typedef['message_typedef']
+    elif field_typedef.get('message_type_name'):
+        if field_typedef['message_type_name'] not in blackboxprotobuf.known_messages:
+            raise TypedefException("Got 'message_type_name' not in known_messages: %s" % field_typedef['message_type_name'])
+        return blackboxprotobuf.known_messages[field_typedef['message_type_name']]
+    else:
+        raise TypedefException("Got 'message' type without typedef or type name: %s" % field_typedef)
 
 def _sort_output(value, typedef):
     """ Sort output by the field number in the typedef. Helps with readability
@@ -198,7 +215,7 @@ def _sort_output(value, typedef):
                 field_name = field_def['name']
         if field_name in value:
             if field_def['type'] == 'message':
-                output_dict[field_name] = _sort_output(value[field_name], field_def['message_typedef'])
+                output_dict[field_name] = _sort_output(value[field_name], _get_typedef_for_message(field_def))
             else:
                 output_dict[field_name] = value[field_name]
     return output_dict
@@ -206,7 +223,7 @@ def _sort_output(value, typedef):
 def _sort_typedef(typedef):
     """ Sort output by field number and sub_keys so name then type is first """
 
-    TYPEDEF_KEY_ORDER = ['name', 'type', 'example_value_ignored']
+    TYPEDEF_KEY_ORDER = ['name', 'type', 'message_type_name', 'example_value_ignored']
     output_dict = collections.OrderedDict()
 
     for field_number, field_def in sorted(typedef.items(), key = lambda t: int(t[0])):

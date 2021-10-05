@@ -372,7 +372,7 @@ def _try_decode_lendelim_fields(buffers, field_key, field_typedef, message_outpu
             outputs_map[output_typedef_num] = output_list
         # was able to decode everything as a message
         field_typedef['type'] = 'message'
-        field_typedef['message_tyepdef'] = all_typedefs["1"]
+        field_typedef['message_typedef'] = all_typedefs["1"]
         if len(all_typedefs.keys()) > 1:
             del all_typedefs["1"]
             field_typedef['alt_typedefs'].update(all_typedefs)

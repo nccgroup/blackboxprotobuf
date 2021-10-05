@@ -12,7 +12,7 @@ import six
 import logging
 from blackboxprotobuf.lib.exceptions import TypedefException
 import blackboxprotobuf.lib.interface
-import blackboxprotobuf.lib.types
+from blackboxprotobuf.lib.types import default_binary_type 
 
 PROTO_FILE_TYPE_MAP = {
     'uint': 'uint64',
@@ -57,7 +57,9 @@ PROTO_FILE_TYPE_TO_BBP= {
     'sfixed64': 'sfixed64',
     'bool': 'uint',
     'string': 'string',
-    'bytes': blackboxprotobuf.lib.types.default_binary_type
+# should be blackboxprotobuf.lib.type.default_binary_type
+# but that creates a circular import?
+    'bytes': default_binary_type
 }
 
 NAME_REGEX = re.compile(r'\A[a-zA-Z][a-zA-Z0-9_]*\Z')
@@ -94,7 +96,7 @@ def _print_message(message_name, typedef, output_file, depth = 0):
         if 'name' in field_typedef and field_typedef['name'] != '':
             field_name = field_typedef['name']
             field_name = field_name.strip()
-            if not field_name.match(NAME_REGEX):
+            if not NAME_REGEX.match(field_name):
                 field_name = None
         if field_name is None:
             field_name = u'field%s' % field_number
@@ -132,15 +134,11 @@ def export_proto(typedef_map, output_filename=None, output_file=None, package=No
         expected as a dictionary of {'message_name': typedef }
 
         Write to output_file or output_filename if provided, otherwise return a string
+        output_filename will be overwritten if it exists
     """
     return_string = False
     if output_filename is not None:
-        if os.path.exists(output_filename):
-            if six.PY2:
-                raise OSError("File %s already exists" % output_filename)
-            else:
-                raise FileExistsError("File %s already exists" % output_filename)
-        output_file = io.open(output_filename, 'w')
+        output_file = io.open(output_filename, 'w+')
 
     if output_file is None:
         return_string = True
@@ -156,7 +154,8 @@ def export_proto(typedef_map, output_filename=None, output_file=None, package=No
 
     if return_string:
         return output_file.getvalue()
-    return
+    output_file.close()
+    return None
 
 MESSAGE_START_REGEX = re.compile(r'^message +([a-zA-Z_0-9]+) *{.*')
 FIELD_REGEX = re.compile(r'^ *(repeated|optional|required)? *([a-zA-Z0-9_]+) +([a-zA-Z0-9_]+) += +([0-9]+) *(\[[a-z]+=[a-z]*\])?.*;.*$')
