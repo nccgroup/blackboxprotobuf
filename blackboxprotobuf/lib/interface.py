@@ -2,6 +2,7 @@
 
 import six
 import json
+import collections
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 from blackboxprotobuf.lib.exceptions import TypedefException
@@ -38,6 +39,8 @@ def protobuf_to_json(*args, **kwargs):
     """
     value, message_type = decode_message(*args, **kwargs)
     value = json_safe_transform(value, message_type, False)
+    value = _sort_output(value, message_type)
+    message_type = _sort_typedef(message_type)
     return json.dumps(value, indent=2), message_type
 
 def protobuf_from_json(json_str, message_type, *args, **kwargs):
@@ -166,3 +169,42 @@ def json_safe_transform(values, typedef, toBytes):
                 else:
                     values[name] = json_safe_encoding(value, typdef[field_number]['message_typedef'])
     return values
+
+def _sort_output(value, typedef):
+    """ Sort output by the field number in the typedef. Helps with readability
+    in a JSON dump """
+    output_dict = collections.OrderedDict()
+
+    for field_number, field_def in sorted(typedef.items(), key = lambda t: int(t[0])):
+        field_name = str(field_number)
+        if field_name not in value:
+            if 'name' in field_def and field_def['name'] != '':
+                field_name = field_def['name']
+        if field_name in value:
+            if field_def['type'] == 'message':
+                output_dict[field_name] = _sort_output(value[field_name], field_def['message_typedef'])
+            else:
+                output_dict[field_name] = value[field_name]
+    return output_dict
+
+def _sort_typedef(typedef):
+    """ Sort output by field number and sub_keys so name then type is first """
+
+    TYPEDEF_KEY_ORDER = ['name', 'type']
+    output_dict = collections.OrderedDict()
+
+    for field_number, field_def in sorted(typedef.items(), key = lambda t: int(t[0])):
+        output_field_def = collections.OrderedDict()
+        field_def = field_def.copy()
+        for key in TYPEDEF_KEY_ORDER:
+            if key in field_def:
+                output_field_def[key] = field_def[key]
+                del field_def[key]
+        for key, value in field_def.items():
+
+            if key == 'message_typedef':
+                output_field_def[key] = _sort_typedef(value)
+            else:
+                output_field_def[key] = value
+        output_dict[field_number] = output_field_def
+    return output_dict
