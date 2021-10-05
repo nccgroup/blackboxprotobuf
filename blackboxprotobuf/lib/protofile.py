@@ -62,7 +62,7 @@ PROTO_FILE_TYPE_TO_BBP= {
     'bytes': default_binary_type
 }
 
-NAME_REGEX = re.compile(r'\A[a-zA-Z][a-zA-Z0-9_.]*\Z')
+NAME_REGEX = re.compile(r'\A[a-zA-Z_][a-zA-Z0-9_]*\Z')
 
 # add packed types to the list
 for packable_type in PACKABLE_TYPES:
@@ -154,7 +154,9 @@ def export_proto(typedef_map, output_filename=None, output_file=None, package=No
 
     if return_string:
         return output_file.getvalue()
-    output_file.close()
+    # close the file if we opened it
+    elif output_filename is not None:
+        output_file.close()
     return None
 
 MESSAGE_START_REGEX = re.compile(r'^message +([a-zA-Z_0-9]+) *{.*')
