@@ -7,7 +7,7 @@ import logging
 
 from google.protobuf.internal import wire_format, encoder, decoder
 
-import blackboxprotobuf.lib.types
+import blackboxprotobuf.lib
 from blackboxprotobuf.lib.types import varint
 from blackboxprotobuf.lib.exceptions import (
     EncoderException, DecoderException, TypedefException, BlackboxProtobufException)
@@ -207,6 +207,13 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
 
             if 'type' not in field_typedef:
                 field_typedef['type'] = blackboxprotobuf.lib.types.wire_type_defaults[wire_type]
+            else:
+                # have a type, but make sure it matches the wiretype
+                if blackboxprotobuf.lib.types.wiretypes[field_typedef['type']] != wire_type:
+                    raise DecoderException(
+                        "Type %s from typedef did not match wiretype %s for "
+                        "field %s"
+                        % (field_typedef['type'], wire_type, field_key))
 
             # we already have a type, just map the decoder
             if field_typedef['type'] not in blackboxprotobuf.lib.types.decoders:
@@ -216,7 +223,7 @@ def decode_message(buf, typedef=None, pos=0, end=None, depth=0, path=None):
             decoder = blackboxprotobuf.lib.types.decoders[field_typedef['type']]
             field_outputs = [ decoder(buf, 0) for buf in buffers ]
 
-            # We already divided up everything by length, this should be redundant
+            # this shouldn't happen, but let's check just in case
             for buf, _pos in zip(buffers, [ y for _, y in field_outputs]):
                 assert(len(buf) == _pos)
 

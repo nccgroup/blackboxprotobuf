@@ -4,15 +4,21 @@
 import traceback
 import json
 import blackboxprotobuf
-from java.awt import Component
+from java.awt import Component, Dimension, Frame
 from java.awt.event import ActionListener, WindowEvent
-from javax.swing import JSplitPane, JPanel, JButton, BoxLayout, JOptionPane, JFrame
+from javax.swing import JSplitPane, JPanel, JButton, BoxLayout, JOptionPane, JDialog, Box, JTextField
 
-class TypeEditorWindow(JFrame):
+class TypeEditorWindow(JDialog):
     """New free-standing window for editing a specified type definition. Will
        callback into the calling class when the type is saved
     """
     def __init__(self, burp_callbacks, typedef, callback):
+        burp_window = None
+        for frame in Frame.getFrames():
+            if "Burp Suite" in frame.getName():
+                burp_window = frame
+                break
+        JDialog.__init__(self, burp_window)
         self._burp_callbacks = burp_callbacks
         self._type_callback = callback
         self.setSize(1000,700)
@@ -36,10 +42,16 @@ class TypeEditorWindow(JFrame):
         panel = JPanel()
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
 
+        panel.add(Box.createRigidArea(Dimension(0, 5)))
         panel.add(self.createButton("Validate", "validate", "Check if typedef is valid" ))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Save", "save", "Save the typedef"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Reset", "reset", "Reset to original"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
         panel.add(self.createButton("Exit", "exit", "Close window and reset"))
+        panel.add(Box.createRigidArea(Dimension(0, 3)))
+
         return panel
 
     def createButton(self, text, command, tooltip):

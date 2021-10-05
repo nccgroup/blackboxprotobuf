@@ -6,6 +6,8 @@ import os
 import sys
 import traceback
 import burp
+from javax.swing import DefaultListModel
+
 
 # Add correct directory to sys.path
 _BASE_DIR = os.path.abspath(os.path.dirname(inspect.getfile(inspect.currentframe())) + '../../../')
@@ -28,6 +30,7 @@ fix_protobuf()
 
 sys.path.insert(0, _BASE_DIR + '/burp-deps/protobuf/python/')
 
+import blackboxprotobuf
 from blackboxprotobuf.burp import editor, typedef_tab
 
 
@@ -41,8 +44,18 @@ class BurpExtender(burp.IBurpExtender):
     def __init__(self):
         self.callbacks = None
         self.helpers = None
-        self.known_types = None
+        self.saved_types = {}
         self.suite_tab = None
+        # global list of known messages for all views
+        # this should mirror what is in blackboxprotobuf.known_messages
+        # TODO bundle them together so it doesn't have to be manually updated
+        self.known_message_model = DefaultListModel()
+        self.refresh_message_model()
+
+    def refresh_message_model(self):
+        self.known_message_model.clear()
+        for name in blackboxprotobuf.known_messages.keys():
+            self.known_message_model.addElement(name)
 
     def registerExtenderCallbacks(self, callbacks):
         """Called by burp. Collects callback object and sets up UI"""
@@ -56,7 +69,7 @@ class BurpExtender(burp.IBurpExtender):
 
             callbacks.registerMessageEditorTabFactory(editor.ProtoBufEditorTabFactory(self))
 
-            self.suite_tab = typedef_tab.TypeDefinitionTab(callbacks)
+            self.suite_tab = typedef_tab.TypeDefinitionTab(self, callbacks)
             callbacks.addSuiteTab(self.suite_tab)
         except Exception as exc:
             self.callbacks.printError(traceback.format_exc())
