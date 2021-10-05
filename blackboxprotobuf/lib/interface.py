@@ -40,6 +40,7 @@ def protobuf_to_json(*args, **kwargs):
     value, message_type = decode_message(*args, **kwargs)
     value = json_safe_transform(value, message_type, False)
     value = _sort_output(value, message_type)
+    _annotate_typedef(message_type, value)
     message_type = _sort_typedef(message_type)
     return json.dumps(value, indent=2), message_type
 
@@ -48,6 +49,7 @@ def protobuf_from_json(json_str, message_type, *args, **kwargs):
     Takes same arguments as encode_message
     """
     value = json.loads(json_str)
+    _strip_typedef_annotations(message_type)
     value = json_safe_transform(value, message_type, True)
     return encode_message(value, message_type, *args, **kwargs)
 
@@ -88,7 +90,7 @@ def validate_typedef(typedef, old_typedef=None, path=None):
 
         valid_type_fields = ["type", "name", "message_typedef",
                              "message_type_name", "group_typedef",
-                             "alt_typedefs"]
+                             "alt_typedefs", 'example_value_ignored']
         for key, value in field_typedef.items():
             # Check field keys against valid values
             if key not in valid_type_fields:
@@ -190,7 +192,7 @@ def _sort_output(value, typedef):
 def _sort_typedef(typedef):
     """ Sort output by field number and sub_keys so name then type is first """
 
-    TYPEDEF_KEY_ORDER = ['name', 'type']
+    TYPEDEF_KEY_ORDER = ['name', 'type', 'example_value_ignored']
     output_dict = collections.OrderedDict()
 
     for field_number, field_def in sorted(typedef.items(), key = lambda t: int(t[0])):
@@ -202,9 +204,37 @@ def _sort_typedef(typedef):
                 del field_def[key]
         for key, value in field_def.items():
 
+            # TODO handle alt typedefs
             if key == 'message_typedef':
                 output_field_def[key] = _sort_typedef(value)
             else:
                 output_field_def[key] = value
         output_dict[field_number] = output_field_def
     return output_dict
+
+def _annotate_typedef(typedef, message):
+    """ Add values from message into the typedef so it's easier to figure out
+    which field when you're editing manually """
+
+    for field_number, field_def in typedef.items():
+        field_value = None
+        field_name = str(field_number)
+        if field_name not in message and field_def['name'] != '':
+            field_name = field_def['name']
+
+        if field_name in message:
+            field_value = message[field_name]
+
+        # TODO handle alt typedefs
+        if field_def['type'] == 'message':
+            _annotate_typedef(field_def['message_typedef'], field_value)
+        else:
+            field_def['example_value_ignored'] = field_value
+
+def _strip_typedef_annotations(typedef):
+    """ Remove example values placed by _annotate_typedef """
+    for _, field_def in typedef.items():
+        if 'example_value_ignored' in field_def:
+            del field_def['example_value_ignored']
+        if 'message_typedef' in field_def:
+            _strip_typedef_annotations(field_def['message_typedef'])
