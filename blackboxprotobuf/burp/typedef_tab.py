@@ -57,28 +57,29 @@ class TypeDefinitionTab(burp.ITab):
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
 
         panel.add(Box.createRigidArea(Dimension(0, 5)))
-        panel.add(self.createButton("Add", "new-type"))
+        panel.add(self.createButton("Add", "new-type", "Create a new type"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Edit", "edit-type"))
+        panel.add(self.createButton("Edit", "edit-type", "Edit the selected type"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Remove", "delete-type"))
+        panel.add(self.createButton("Remove", "delete-type", "Delete all selected types"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Save All Types To File", "save-types"))
+        panel.add(self.createButton("Save All Types To File", "save-types", "Save all known types as JSON to a file"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Load All Types From File", "load-types"))
+        panel.add(self.createButton("Load All Types From File", "load-types", "Load types from JSON file"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Export All types As .proto", "export-proto"))
+        panel.add(self.createButton("Export All types As .proto", "export-proto", "Export all types as .proto"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
-        panel.add(self.createButton("Import .proto", "import-proto"))
+        panel.add(self.createButton("Import .proto", "import-proto", "Import types from a .proto file"))
         panel.add(Box.createRigidArea(Dimension(0, 3)))
         return panel
 
-    def createButton(self, text, command):
+    def createButton(self, text, command, tooltip):
         """Generate new button with the given text and command string"""
         button = JButton(text)
         button.setAlignmentX(Component.CENTER_ALIGNMENT)
         button.setActionCommand(command)
         button.addActionListener(self._button_listener)
+        button.setToolTipText(tooltip)
         return button
 
     def updateList(self):

@@ -252,19 +252,20 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
 
         if self._editable:
-            panel.add(self.createButton("Validate", "validate"))
-        panel.add(self.createButton("Save Type", "save-type"))
-        panel.add(self.createButton("Load Type", "load-type"))
-        panel.add(self.createButton("Edit Type", "edit-type"))
-        panel.add(self.createButton("Reset", "reset"))
+            panel.add(self.createButton("Validate", "validate", "Validate the message can be encoded."))
+        panel.add(self.createButton("Save Type", "save-type", "Save the message's type"))
+        panel.add(self.createButton("Load Type", "load-type", "Apply a previously saved type"))
+        panel.add(self.createButton("Edit Type", "edit-type", "Edit the message type"))
+        panel.add(self.createButton("Reset", "reset", "Reset the message and undo changes"))
         return panel
 
-    def createButton(self, text, command):
+    def createButton(self, text, command, tooltip):
         """Create a new button with the given text and command"""
         button = JButton(text)
         button.setAlignmentX(Component.CENTER_ALIGNMENT)
         button.setActionCommand(command)
         button.addActionListener(self._button_listener)
+        button.setToolTipText(tooltip)
         return button
 
     def validateMessage(self):

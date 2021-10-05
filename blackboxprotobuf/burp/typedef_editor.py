@@ -36,18 +36,19 @@ class TypeEditorWindow(JFrame):
         panel = JPanel()
         panel.setLayout(BoxLayout(panel, BoxLayout.Y_AXIS))
 
-        panel.add(self.createButton("Validate", "validate"))
-        panel.add(self.createButton("Apply", "apply"))
-        panel.add(self.createButton("Reset", "reset"))
-        panel.add(self.createButton("Exit", "exit"))
+        panel.add(self.createButton("Validate", "validate", "Check if typedef is valid" ))
+        panel.add(self.createButton("Save", "save", "Save the typedef"))
+        panel.add(self.createButton("Reset", "reset", "Reset to original"))
+        panel.add(self.createButton("Exit", "exit", "Close window and reset"))
         return panel
 
-    def createButton(self, text, command):
+    def createButton(self, text, command, tooltip):
         """Generate a new button with a given text and command"""
         button = JButton(text)
         button.setAlignmentX(Component.CENTER_ALIGNMENT)
         button.setActionCommand(command)
         button.addActionListener(self._button_listener)
+        button.setToolTipText(tooltip)
         return button
 
     def applyType(self):
@@ -98,7 +99,7 @@ class TypeEditorButtonListener(ActionListener):
         """Called when a button is pressed"""
         if event.getActionCommand() == "validate":
             self._type_editor.validateType()
-        elif event.getActionCommand() == "apply":
+        elif event.getActionCommand() == "save":
             self._type_editor.applyType()
         elif event.getActionCommand() == "reset":
             self._type_editor.resetTypeWindow()
