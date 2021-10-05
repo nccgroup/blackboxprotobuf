@@ -140,10 +140,11 @@ def encode_message(data, typedef, path=None):
             elif 'message_typedef' in field_typedef:
                 innertypedef = field_typedef['message_typedef']
             elif 'message_type_name' in field_typedef:
-                if field_typedef['message_type_name'] not in blackboxprotobuf.lib.known_messages:
+                message_type_name = field_typedef['message_type_name']
+                if message_type_name not in blackboxprotobuf.known_messages:
                     raise TypedefException("Message type (%s) has not been defined"
                                            % field_typedef['message_type_name'], field_path)
-                innertypedef = field_typedef['message_type_name']
+                innertypedef = blackboxprotobuf.known_messages[message_type_name]
             else:
                 raise TypedefException("Could not find message typedef for %s" % field_number, field_path)
 

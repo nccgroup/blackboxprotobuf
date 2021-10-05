@@ -2,11 +2,14 @@ from hypothesis import given, example, note
 import hypothesis.strategies as st
 import hypothesis
 import strategies
+import warnings
 import json
 import six
 
 import blackboxprotobuf
 
+
+warnings.filterwarnings('ignore', 'Call to deprecated create function.*', )
 
 try:
     import Test_pb2

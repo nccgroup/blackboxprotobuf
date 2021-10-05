@@ -7,7 +7,7 @@ import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 from blackboxprotobuf.lib.exceptions import TypedefException
 
-known_messages = {}
+blackboxprotobuf.known_messages = {}
 
 def decode_message(buf, message_type=None):
     """Decode a message to a Python dictionary.
@@ -21,7 +21,7 @@ def decode_message(buf, message_type=None):
         if message_type not in known_messages:
             message_type = {}
         else:
-            message_type = known_messages[message_type]
+            message_type = blackboxprotobuf.known_messages[message_type]
 
     value, typedef, _ = blackboxprotobuf.lib.types.length_delim.decode_message(buf, message_type)
     return value, typedef
@@ -52,6 +52,20 @@ def protobuf_from_json(json_str, message_type, *args, **kwargs):
     _strip_typedef_annotations(message_type)
     value = json_safe_transform(value, message_type, True)
     return encode_message(value, message_type, *args, **kwargs)
+
+def export_protofile(message_types, output_filename):
+    """ Export the give messages as ".proto" file.
+        Expects a dictionary with {message_name: typedef} and a filename to
+        write to.
+    """
+    blackboxprotobuf.lib.protofile.export_proto(message_types, output_filename=output_filename)
+
+def import_protofile(input_filename):
+    """ import ".proto" files into the "known_messages" variables.
+        Expects a filename for the ".proto" file
+    """
+    imported_types = blackboxprotobuf.lib.protofile.import_proto(input_filename=input_filename)
+    blackboxprotobuf.known_messages.update(imported_types)
 
 def validate_typedef(typedef, old_typedef=None, path=None):
     """Validate the typedef format. Optionally validate wiretype of a field
@@ -89,8 +103,8 @@ def validate_typedef(typedef, old_typedef=None, path=None):
                     % (alt_field_number, field_number), field_path)
 
         valid_type_fields = ["type", "name", "message_typedef",
-                             "message_type_name", "group_typedef",
-                             "alt_typedefs", 'example_value_ignored']
+                             "message_type_name", "alt_typedefs",
+                             "example_value_ignored", "seen_repeated"]
         for key, value in field_typedef.items():
             # Check field keys against valid values
             if key not in valid_type_fields:
@@ -115,9 +129,9 @@ def validate_typedef(typedef, old_typedef=None, path=None):
 
             # Check if message type name is known
             if key == "message_type_name":
-                if value not in known_messages:
+                if value not in blackboxprotobuf.known_messages:
                     raise TypedefException(("Message type \"%s\" for field number"
-                                            " %s is not known") % (value, field_number), field_path)
+                                            " %s is not known. Known types: %s") % (value, field_number, blackboxprotobuf.known_messages.keys()), field_path)
 
             # Recursively validate inner typedefs
             if key in ["message_typedef", "group_typedef"]:

@@ -1,3 +1,4 @@
+import binascii
 import hypothesis.strategies as st
 from blackboxprotobuf.lib.types import type_maps
 
@@ -68,8 +69,8 @@ input_map = {
     'sint': st.integers(min_value=-(2**63), max_value=2**63),
     'bytes':  st.binary(),
     'string':  st.text(),
+    #'bytes_hex':  st.binary().map(binascii.hexlify),
     'message':  gen_message(),
-    'group': None
 }
 input_map.update({
     'packed_uint': st.lists(input_map['uint'], min_size=1),
@@ -81,5 +82,9 @@ input_map.update({
     'packed_fixed64': st.lists(input_map['fixed64'], min_size=1),
     'packed_sfixed64': st.lists(input_map['sfixed64'], min_size=1),
     'packed_double': st.lists(input_map['double'], min_size=1),
+    'packed_bytes': st.lists(input_map['bytes'], min_size=1),
+    'packed_string': st.lists(input_map['string'], min_size=1),
+    'packed_bytes': st.lists(input_map['bytes'], min_size=1),
+    #'packed_bytes_hex': st.lists(input_map['bytes_hex'], min_size=1),
 })
 
