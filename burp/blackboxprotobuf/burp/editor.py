@@ -35,12 +35,13 @@ NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
 class ProtoBufEditorTabFactory(burp.IMessageEditorTabFactory):
     """Just returns instances of ProtoBufEditorTab"""
 
-    def __init__(self, extender):
+    def __init__(self, extender, callbacks):
+        self._callbacks = callbacks
         self._extender = extender
 
     def createNewInstance(self, controller, editable):
         """Return new instance of editor tab for a new message"""
-        return ProtoBufEditorTab(self._extender, controller, editable)
+        return ProtoBufEditorTab(self._extender, controller, editable, self._callbacks)
 
 
 class ProtoBufEditorTab(burp.IMessageEditorTab):
@@ -49,8 +50,9 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
     The message type is attached to this object.
     """
 
-    def __init__(self, extension, controller, editable):
+    def __init__(self, extension, controller, editable, callbacks):
 
+        self._callbacks = callbacks
         self._extension = extension
         self._callbacks = extension.callbacks
         self._helpers = extension.helpers
@@ -64,7 +66,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._last_valid_type_index = None
 
         self._filtered_message_model = FilteredMessageModel(
-            extension.known_message_model
+            extension.known_message_model, self._callbacks
         )
 
         self._type_list_component = JList(self._filtered_message_model)
@@ -291,9 +293,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             return False
 
         protobuf_content_types = [
-            "x-protobuf",
-            "application/protobuf",
-            "application/grpc",
+            "protobuf",
+            "grpc",
         ]
         # Check all headers for x-protobuf
         for header in info.getHeaders():
@@ -575,7 +576,8 @@ class FilteredMessageModel(ListModel, ListDataListener):
     """listens to a java ListModel and keeps a subset with just valid types
     for a message"""
 
-    def __init__(self, parent):
+    def __init__(self, parent, callbacks):
+        self._callbacks = callbacks
         self._data = None
         self._parent_model = parent
         self._listeners = []

@@ -50,12 +50,13 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
             callbacks.registerExtensionStateListener(self)
 
             self.callbacks = callbacks
+
             self.helpers = callbacks.getHelpers()
 
             callbacks.setExtensionName(EXTENSION_NAME)
 
             callbacks.registerMessageEditorTabFactory(
-                editor.ProtoBufEditorTabFactory(self)
+                editor.ProtoBufEditorTabFactory(self, callbacks)
             )
 
             self.suite_tab = typedef_tab.TypeDefinitionTab(self, callbacks)

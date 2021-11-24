@@ -328,7 +328,7 @@ class TypeDefinitionButtonListener(ActionListener):
             )
             chooser.setMultiSelectionEnabled(False)
 
-            action = chooser.showSaveDialog(self._typedef_tab.getUiComponent())
+            action = chooser.showOpenDialog(self._typedef_tab.getUiComponent())
             if (
                 action == JFileChooser.CANCEL_OPTION
                 or action == JFileChooser.ERROR_OPTION
@@ -367,5 +367,5 @@ class TypeDefinitionButtonListener(ActionListener):
                 self._typedef_tab._burp_callbacks.printError(traceback.format_exc())
                 JOptionPane.showMessageDialog(
                     self._typedef_tab._component,
-                    "Error saving .proto file: " + str(exc),
+                    "Error loading .proto file: " + str(exc),
                 )
