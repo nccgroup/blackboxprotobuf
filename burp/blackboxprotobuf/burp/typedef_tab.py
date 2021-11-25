@@ -361,8 +361,9 @@ class TypeDefinitionButtonListener(ActionListener):
                         )
                         if not overwrite:
                             continue
+                    else:
+                        self._typedef_tab._extension.known_message_model.addElement(key)
                     default_config.known_types[key] = value
-                    self._typedef_tab._extension.known_message_model.addElement(key)
             except Exception as exc:
                 self._typedef_tab._burp_callbacks.printError(traceback.format_exc())
                 JOptionPane.showMessageDialog(
