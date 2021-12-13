@@ -534,6 +534,9 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._new_type_field.setText("")
         self._extension.saved_types[self._message_hash] = name
 
+        # force select our new type
+        self.forceSelectType(name)
+
     def clearType(self):
         self.applyType({})
         self._type_list_component.clearSelection()
