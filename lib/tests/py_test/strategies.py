@@ -8,10 +8,16 @@ from hypothesis import database
 from datetime import timedelta
 
 settings.register_profile(
-    "quick", max_examples=100, database=database.ExampleDatabase(".hypothesis-db")
+    "quick",
+    max_examples=100,
+    database=database.ExampleDatabase(".hypothesis-db"),
+    print_blob=True,
 )
 settings.register_profile(
-    "extended", max_examples=1000, database=database.ExampleDatabase(".hypothesis-db")
+    "extended",
+    max_examples=1000,
+    database=database.ExampleDatabase(".hypothesis-db"),
+    print_blob=True,
 )
 settings.load_profile("quick")
 
