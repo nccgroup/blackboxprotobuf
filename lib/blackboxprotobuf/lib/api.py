@@ -55,7 +55,7 @@ def protobuf_to_json(*args, **kwargs):
     """
     value, message_type = decode_message(*args, **kwargs)
     value = json_safe_transform(
-        value, message_type, False, config=kwargs.get("cofnig", None)
+        value, message_type, False, config=kwargs.get("config", None)
     )
     value = sort_output(value, message_type, config=kwargs.get("config", None))
     _annotate_typedef(message_type, value)
