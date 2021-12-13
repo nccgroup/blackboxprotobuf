@@ -266,17 +266,35 @@ def json_safe_transform(values, typedef, toBytes, config=None):
     }
     for name, value in values.items():
         alt_number = None
+        base_name = name
         if "-" in name:
-            name, alt_number = name.split("-")
+            base_name, alt_number = name.split("-")
 
-        if name in name_map:
-            field_number = name_map[name]
+        if base_name in name_map:
+            field_number = name_map[base_name]
         else:
-            field_number = name
+            field_number = base_name
 
         field_type = typedef[field_number]["type"]
-        is_list = isinstance(values[name], list)
-        field_values = values[name] if is_list else [values[name]]
+        if field_type == "message":
+            field_typedef = _get_typedef_for_message(typedef[field_number], config)
+            if alt_number is not None:
+                # if we have an alt type, then let's look that up instead
+                if alt_number not in typedef[field_number].get("alt_typedefs", {}):
+                    raise TypedefException(
+                        (
+                            "Provided alt field name/number "
+                            "%s is not valid for field_number %s"
+                        )
+                        % (alt_number, field_number)
+                    )
+                field_type = typedef[field_number]["alt_typedefs"][alt_number]
+                if isinstance(field_type, dict):
+                    field_typedef = field_type
+                    field_type = "message"
+
+        is_list = isinstance(value, list)
+        field_values = value if is_list else [value]
         for i, field_value in enumerate(field_values):
             if field_type == "bytes":
                 if toBytes:
@@ -284,26 +302,12 @@ def json_safe_transform(values, typedef, toBytes, config=None):
                 else:
                     field_values[i] = field_value.decode("latin1")
             elif field_type == "message":
-                if alt_number is not None:
-                    if alt_number not in typedef[field_number]["alt_typedefs"]:
-                        raise TypedefException(
-                            (
-                                "Provided alt field name/number "
-                                "%s is not valid for field_number %s"
-                            )
-                            % (alt_number, field_number)
-                        )
-                    field_values[i] = json_safe_transform(
-                        field_value,
-                        typedef[field_number]["alt_typedefs"][alt_number],
-                        toBytes,
-                    )
-                else:
-                    field_values[i] = json_safe_transform(
-                        field_value,
-                        _get_typedef_for_message(typedef[field_number], config),
-                        toBytes,
-                    )
+                field_values[i] = json_safe_transform(
+                    field_value,
+                    field_typedef,
+                    toBytes,
+                    config=config,
+                )
 
         # convert back to single value if needed
         if not is_list:
@@ -337,27 +341,59 @@ def sort_output(value, typedef, config=None):
     if config is None:
         config = blackboxprotobuf.lib.config.default
 
+    # Make a list of all the field names we have, aggregate together the alt fields as well
+    field_names = {}
+    for field_name in value.keys():
+        if "-" in field_name:
+            field_name_base, alt_number = field_name.split("-")
+        else:
+            field_name_base = field_name
+            alt_number = None
+        field_names.setdefault(field_name_base, []).append((field_name, alt_number))
+
     for field_number, field_def in sorted(typedef.items(), key=lambda t: int(t[0])):
-        field_name = str(field_number)
-        if field_name not in value:
-            if field_def.get("name", "") != "":
-                field_name = field_def["name"]
-        if field_name in value:
-            if field_def["type"] == "message":
+        field_number = str(field_number)
+        seen_field_names = field_names.get(field_number, [])
+
+        # Try getting matching fields by name as well
+        if field_def.get("name", "") != "":
+            field_name = field_def["name"]
+            seen_field_names.extend(field_names.get(field_name, []))
+
+        for field_name, alt_number in seen_field_names:
+            field_type = field_def["type"]
+            field_message_typedef = None
+            if field_type == "message":
+                field_message_typedef = _get_typedef_for_message(field_def, config)
+
+            if alt_number is not None:
+                if alt_number not in field_def["alt_typedefs"]:
+                    raise TypedefException(
+                        (
+                            "Provided alt field name/number "
+                            "%s is not valid for field_number %s"
+                        )
+                        % (alt_number, field_number)
+                    )
+                field_type = field_def["alt_typedefs"][alt_number]
+                if isinstance(field_type, dict):
+                    field_message_typedef = field_type
+                    field_type = "message"
+
+            if field_type == "message":
                 if not isinstance(value[field_name], list):
                     output_dict[field_name] = sort_output(
-                        value[field_name], _get_typedef_for_message(field_def, config)
+                        value[field_name], field_message_typedef
                     )
                 else:
                     output_dict[field_name] = []
                     for field_value in value[field_name]:
                         output_dict[field_name].append(
-                            sort_output(
-                                field_value, _get_typedef_for_message(field_def, config)
-                            )
+                            sort_output(field_value, field_message_typedef)
                         )
             else:
                 output_dict[field_name] = value[field_name]
+
     return output_dict
 
 
@@ -398,11 +434,15 @@ def _annotate_typedef(typedef, message):
         if field_name in message:
             field_value = message[field_name]
 
-        # TODO handle alt typedefs
-        if field_def["type"] == "message":
-            _annotate_typedef(field_def["message_typedef"], field_value)
-        else:
-            field_def["example_value_ignored"] = field_value
+            # TODO handle alt typedefs
+            if field_def["type"] == "message":
+                if isinstance(field_value, list):
+                    for value in field_value:
+                        _annotate_typedef(field_def["message_typedef"], value)
+                else:
+                    _annotate_typedef(field_def["message_typedef"], field_value)
+            else:
+                field_def["example_value_ignored"] = field_value
 
 
 def _strip_typedef_annotations(typedef):
