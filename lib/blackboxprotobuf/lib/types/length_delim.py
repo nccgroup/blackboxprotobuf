@@ -457,7 +457,7 @@ def _try_decode_lendelim_fields(
             if output is None:
                 output, output_typedef, _ = decode_lendelim_message(buf, config, {})
                 output_typedef_num = str(
-                    max([int(i) for i in ["0"] + all_typedefs.keys()]) + 1
+                    max([int(i) for i in ["0"] + list(all_typedefs.keys())]) + 1
                 )
 
             # save the output or typedef we found
@@ -470,7 +470,7 @@ def _try_decode_lendelim_fields(
         field_typedef["message_typedef"] = all_typedefs["1"]
         if len(all_typedefs.keys()) > 1:
             del all_typedefs["1"]
-            field_typedef["alt_typedefs"].update(all_typedefs)
+            field_typedef.setdefault("alt_typedefs", {}).update(all_typedefs)
         # messages get set as "key-alt_number"
         for output_typedef_num, outputs in outputs_map.items():
             output_field_key = field_key
@@ -507,16 +507,22 @@ def _try_decode_lendelim_fields(
                 # check if we already have this type as an alt_typedef
                 output_typedef_nums = {
                     key: value
-                    for key, value in field_key["alt_typedefs"].items()
+                    for key, value in field_typedef.setdefault(
+                        "alt_typedefs", {}
+                    ).items()
                     if value == target_type
                 }.keys()
                 output_typedef_num = None
                 if len(output_typedef_nums) == 0:
+                    # find the next largest alt typedef number to put this type as
                     output_typedef_num = str(
                         max([int(i) for i in ["0"] + all_typedefs.keys()]) + 1
                     )
-                    field_typedef["alt_typedefs"][output_typedef_num] = target_type
+                    field_typedef.setdefault("alt_typedefs", {})[
+                        output_typedef_num
+                    ] = target_type
                 else:
+                    # we already have an alt typedef with this number
                     output_typedef_num = output_typedef_nums[0]
                 message_output[field_key + "-" + output_typedef_num] = (
                     outputs if len(outputs) > 1 else outputs[0]
