@@ -1,5 +1,6 @@
 import binascii
 import hypothesis.strategies as st
+import blackboxprotobuf
 from blackboxprotobuf.lib.types import type_maps
 
 from hypothesis import settings
@@ -16,19 +17,23 @@ settings.load_profile("quick")
 
 
 @st.composite
-def message_typedef_gen(draw, max_depth=3):
+def message_typedef_gen(draw, max_depth=3, types=None):
     output = {}
     field_numbers = draw(
         st.lists(st.integers(min_value=1, max_value=2000).map(str), min_size=1)
     )
-    for field_number in field_numbers:
-        field_name = str(field_number)
+    if types is None:
         message_types = [
             field_type
             for field_type in type_maps.WIRETYPES.keys()
             if field_type in input_map and input_map[field_type] is not None
         ]
-        if max_depth == 0:
+    else:
+        message_types = types
+
+    for field_number in field_numbers:
+        field_name = str(field_number)
+        if max_depth == 0 and "message" in message_types:
             message_types.remove("message")
         field_type = draw(st.sampled_from(message_types))
         output[field_name] = {}
@@ -37,7 +42,7 @@ def message_typedef_gen(draw, max_depth=3):
             output[field_name]["seen_repeated"] = draw(st.booleans())
         if field_type == "message":
             output[field_number]["message_typedef"] = draw(
-                message_typedef_gen(max_depth=max_depth - 1)
+                message_typedef_gen(max_depth=max_depth - 1, types=types)
             )
         # TODO give the field a name
 
@@ -68,8 +73,17 @@ def gen_message_data(draw, type_def):
 
 
 @st.composite
-def gen_message(draw):
-    type_def = draw(message_typedef_gen())
+# if anon is True, typedef will only have "default" types that it will decode
+# to without a typedef
+def gen_message(draw, anon=False):
+    allowed_types = None
+    if anon:
+        allowed_types = list(
+            filter(lambda x: x is not None, type_maps.WIRE_TYPE_DEFAULTS.values())
+        )
+        # add length delim wiretypes
+        allowed_types += ["message", "string", "bytes"]
+    type_def = draw(message_typedef_gen(types=allowed_types))
     message = draw(gen_message_data(type_def))
     return type_def, message
 

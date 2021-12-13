@@ -83,6 +83,6 @@ WIRE_TYPE_DEFAULTS = {
     wire_format.WIRETYPE_FIXED32: "fixed32",
     wire_format.WIRETYPE_FIXED64: "fixed64",
     wire_format.WIRETYPE_LENGTH_DELIMITED: None,
-    wire_format.WIRETYPE_START_GROUP: "group",
+    wire_format.WIRETYPE_START_GROUP: None,
     wire_format.WIRETYPE_END_GROUP: None,
 }
