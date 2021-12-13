@@ -200,13 +200,16 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             success = True
         except Exception as exc:
             success = False
-            self._callbacks.printError(traceback.format_exc())
+            self._callbacks.printError(
+                "Got error decoding protobuf binary: " + traceback.format_exc()
+            )
 
         # Bring out of exception handler to avoid nexting handlers
         if not success:
             if self._message_hash in self._extension.saved_types:
                 del self._extension.saved_types[self._message_hash]
                 self.setMessage(content, is_request, False)
+                self._text_editor.setText("Error decoding protobuf")
 
         if self.message_type_name:
             self.forceSelectType(self.message_type_name)
