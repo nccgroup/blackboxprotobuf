@@ -42,7 +42,7 @@ def decode_uvarint(buf, pos):
         buf = str(buf)
     try:
         value, pos = decoder._DecodeVarint(buf, pos)
-    except (TypeError, IndexError) as exc:
+    except (TypeError, IndexError, decoder._DecodeError) as exc:
         six.raise_from(
             DecoderException(
                 "Error decoding uvarint from %s..."
