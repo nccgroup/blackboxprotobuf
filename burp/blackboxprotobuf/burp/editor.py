@@ -435,6 +435,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         """Apply a new typedef based on the selected type in the type list"""
         # Check if something is selected
         if self._type_list_component.isSelectionEmpty():
+            self._last_valid_type_index = None
+            del self._extension.saved_types[self._message_hash]
             return
 
         # TODO won't actually work right if we delete the type we're using a
