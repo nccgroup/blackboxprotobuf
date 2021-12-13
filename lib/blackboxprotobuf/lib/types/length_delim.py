@@ -430,13 +430,12 @@ def _try_decode_lendelim_fields(
         outputs_map = {}
         # grab all dictonary alt_typedefs
         all_typedefs = {
-            key: value
+            # we don't want this to modify in-place if it fails
+            key: copy.deepcopy(value)
             for key, value in field_typedef.get("alt_typedefs", {}).items()
             if isinstance(value, dict)
         }
-        all_typedefs["1"] = field_typedef.get("message_typedef", {})
-
-        out_typedefs = {}
+        all_typedefs["1"] = copy.deepcopy(field_typedef.get("message_typedef", {}))
 
         for buf in buffers:
             output = None
@@ -462,7 +461,7 @@ def _try_decode_lendelim_fields(
                 )
 
             # save the output or typedef we found
-            out_typedefs[output_typedef_num] = output_typedef
+            all_typedefs[output_typedef_num] = output_typedef
             output_list = outputs_map.get(output_typedef_num, [])
             output_list.append(output)
             outputs_map[output_typedef_num] = output_list
