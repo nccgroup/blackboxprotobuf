@@ -220,7 +220,6 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
                 if old_typedef is None:
                     validate_typedef(value, path=field_path, config=config)
                 else:
-                    # print(old_typedef.keys())
                     validate_typedef(
                         value, old_typedef[field_number][key], path=field_path
                     )
@@ -269,14 +268,21 @@ def json_safe_transform(values, typedef, toBytes, config=None):
         alt_number = None
         if "-" in name:
             name, alt_number = name.split("-")
+
         if name in name_map:
             field_number = name_map[name]
-            field_type = typedef[field_number]["type"]
+        else:
+            field_number = name
+
+        field_type = typedef[field_number]["type"]
+        is_list = isinstance(values[name], list)
+        field_values = values[name] if is_list else [values[name]]
+        for i, field_value in enumerate(field_values):
             if field_type == "bytes":
                 if toBytes:
-                    values[name] = values[name].encode("latin1")
+                    field_values[i] = field_value.encode("latin1")
                 else:
-                    values[name] = values[name].decode("latin1")
+                    field_values[i] = field_value.decode("latin1")
             elif field_type == "message":
                 if alt_number is not None:
                     if alt_number not in typedef[field_number]["alt_typedefs"]:
@@ -287,18 +293,23 @@ def json_safe_transform(values, typedef, toBytes, config=None):
                             )
                             % (alt_number, field_number)
                         )
-                    values[name] = json_safe_transform(
-                        value,
+                    field_values[i] = json_safe_transform(
+                        field_value,
                         typedef[field_number]["alt_typedefs"][alt_number],
                         toBytes,
                     )
                 else:
-                    values[name] = json_safe_transform(
-                        value,
+                    field_values[i] = json_safe_transform(
+                        field_value,
                         _get_typedef_for_message(typedef[field_number], config),
                         toBytes,
                     )
 
+        # convert back to single value if needed
+        if not is_list:
+            values[name] = field_values[0]
+        else:
+            values[name] = field_values
     return values
 
 
@@ -329,13 +340,22 @@ def sort_output(value, typedef, config=None):
     for field_number, field_def in sorted(typedef.items(), key=lambda t: int(t[0])):
         field_name = str(field_number)
         if field_name not in value:
-            if "name" in field_def and field_def["name"] != "":
+            if field_def.get("name", "") != "":
                 field_name = field_def["name"]
         if field_name in value:
             if field_def["type"] == "message":
-                output_dict[field_name] = sort_output(
-                    value[field_name], _get_typedef_for_message(field_def, config)
-                )
+                if not isinstance(value[field_name], list):
+                    output_dict[field_name] = sort_output(
+                        value[field_name], _get_typedef_for_message(field_def, config)
+                    )
+                else:
+                    output_dict[field_name] = []
+                    for field_value in value[field_name]:
+                        output_dict[field_name].append(
+                            sort_output(
+                                field_value, _get_typedef_for_message(field_def, config)
+                            )
+                        )
             else:
                 output_dict[field_name] = value[field_name]
     return output_dict
@@ -372,7 +392,7 @@ def _annotate_typedef(typedef, message):
     for field_number, field_def in typedef.items():
         field_value = None
         field_name = str(field_number)
-        if field_name not in message and field_def["name"] != "":
+        if field_name not in message and field_def.get("name", "") != "":
             field_name = field_def["name"]
 
         if field_name in message:
