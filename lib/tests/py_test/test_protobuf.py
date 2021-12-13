@@ -3,6 +3,7 @@ import hypothesis.strategies as st
 import hypothesis
 import strategies
 import warnings
+import base64
 import json
 import six
 
