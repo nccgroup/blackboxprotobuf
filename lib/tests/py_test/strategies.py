@@ -23,11 +23,13 @@ settings.load_profile("quick")
 
 
 @st.composite
-def message_typedef_gen(draw, max_depth=3, types=None):
+def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=True):
     output = {}
     field_numbers = draw(
         st.lists(st.integers(min_value=1, max_value=2000).map(str), min_size=1)
     )
+    # pre-generate names so we can be sure they're unique
+    field_names = draw(st.lists(st.from_regex(blackboxprotobuf.NAME_REGEX), min_size=len(field_numbers), max_size=len(field_numbers), unique_by=lambda x: x.lower()))
     if types is None:
         message_types = [
             field_type
@@ -37,20 +39,22 @@ def message_typedef_gen(draw, max_depth=3, types=None):
     else:
         message_types = types
 
-    for field_number in field_numbers:
-        field_name = str(field_number)
+    for field_number, field_name in zip(field_numbers, field_names):
+        field_number = str(field_number)
         if max_depth == 0 and "message" in message_types:
             message_types.remove("message")
         field_type = draw(st.sampled_from(message_types))
-        output[field_name] = {}
-        output[field_name]["type"] = field_type
+        output[field_number] = {}
+        output[field_number]["type"] = field_type
         if not field_type.startswith("packed"):
-            output[field_name]["seen_repeated"] = draw(st.booleans())
+            output[field_number]["seen_repeated"] = draw(st.booleans())
         if field_type == "message":
             output[field_number]["message_typedef"] = draw(
-                message_typedef_gen(max_depth=max_depth - 1, types=types)
+                message_typedef_gen(max_depth=max_depth - 1, anon=anon, types=types, named_fields=named_fields)
             )
-        # TODO give the field a name
+        # decide whether to give it a name
+        if named_fields and not anon and draw(st.booleans()):
+            output[field_number]["name"] = field_name
 
     return output
 
@@ -81,7 +85,7 @@ def gen_message_data(draw, type_def):
 @st.composite
 # if anon is True, typedef will only have "default" types that it will decode
 # to without a typedef
-def gen_message(draw, anon=False):
+def gen_message(draw, anon=False, named_fields=True):
     allowed_types = None
     if anon:
         allowed_types = list(
@@ -89,7 +93,7 @@ def gen_message(draw, anon=False):
         )
         # add length delim wiretypes
         allowed_types += ["message", "string", "bytes"]
-    type_def = draw(message_typedef_gen(types=allowed_types))
+    type_def = draw(message_typedef_gen(anon=anon, types=allowed_types, named_fields=named_fields))
     message = draw(gen_message_data(type_def))
     return type_def, message
 

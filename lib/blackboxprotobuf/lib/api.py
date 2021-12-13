@@ -99,7 +99,7 @@ def import_protofile(input_filename, save_to_known=True, config=None):
         return new_typedefs
 
 
-NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
+NAME_REGEX = re.compile(r"\A[a-zA-Z][a-zA-Z0-9_]*\Z")
 
 
 def validate_typedef(typedef, old_typedef=None, path=None, config=None):
@@ -185,7 +185,7 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
                     )
             # Check for duplicate names
             if key == "name":
-                if value in field_names:
+                if value.lower() in field_names:
                     raise TypedefException(
                         ('Duplicate field name "%s" for field ' "number %s")
                         % (value, field_number),
@@ -201,7 +201,7 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
                         field_path,
                     )
                 if value != "":
-                    field_names.add(value)
+                    field_names.add(value.lower())
 
             # Check if message type name is known
             if key == "message_type_name":

@@ -27,7 +27,7 @@ if six.PY3:
 
 
 @given(
-    typedef=strategies.message_typedef_gen(), name=st.from_regex(protofile.NAME_REGEX)
+    typedef=strategies.message_typedef_gen(named_fields=False), name=st.from_regex(protofile.NAME_REGEX)
 )
 @settings(suppress_health_check=to_suppress)
 def test_proto_export(tmp_path, typedef, name):
@@ -54,7 +54,7 @@ def test_proto_export(tmp_path, typedef, name):
         )
 
 
-@given(x=strategies.gen_message(), name=st.from_regex(protofile.NAME_REGEX))
+@given(x=strategies.gen_message(named_fields=False), name=st.from_regex(protofile.NAME_REGEX))
 @settings(suppress_health_check=to_suppress)
 def test_proto_export_inverse(tmp_path, x, name):
     """Generate a proto file and try to re-import it. This does not cover all
@@ -143,7 +143,7 @@ def test_proto_import_examples():
             blackboxprotobuf.lib.validate_typedef(typedef, config=config)
 
 
-@given(x=strategies.gen_message(), name=st.from_regex(protofile.NAME_REGEX))
+@given(x=strategies.gen_message(named_fields=False), name=st.from_regex(protofile.NAME_REGEX))
 @settings(suppress_health_check=to_suppress)
 @pytest.mark.filterwarnings("ignore:Call to deprecated create function.*")
 def test_proto_decode(tmp_path, x, name):
