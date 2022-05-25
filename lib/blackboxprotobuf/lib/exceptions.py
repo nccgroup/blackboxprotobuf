@@ -35,7 +35,7 @@ class BlackboxProtobufException(Exception):
 
 class TypedefException(BlackboxProtobufException):
     """Thrown when an error is identified in the type definition, such as
-    conflicting or incosistent values."""
+    conflicting or inconsistent values."""
 
     def __str__(self):
         message = super(TypedefException, self).__str__()

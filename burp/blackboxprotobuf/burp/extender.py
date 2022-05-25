@@ -1,5 +1,5 @@
 """Adds the top level type definition editor and registers the protobuf message
-   editor factory for individual tabs
+editor factory for individual tabs
 """
 
 # Copyright (c) 2018-2022 NCC Group Plc

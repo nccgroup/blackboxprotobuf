@@ -67,8 +67,9 @@ class ProtoBufEditorTabFactory(burp.IMessageEditorTabFactory):
 
 class ProtoBufEditorTab(burp.IMessageEditorTab):
     """Tab in interceptor/repeater for editing protobuf message.
-    Decodes them to JSON and back.
-    The message type is attached to this object.
+
+    Decodes the message to JSON and back for editing.
+    The message type definition is attached to this object for re-encoding or editing.
     """
 
     def __init__(self, extension, controller, editable, callbacks):
@@ -154,9 +155,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             return self._original_content
 
     def setMessage(self, content, is_request, retry=True):
-        """Get the data from the request/response and parse into JSON.
-        sets self.message_type
-        """
+        """Get the data from the request/response and parse into JSON."""
         # Save original content
         self._original_content = content
         if is_request:
@@ -243,12 +242,12 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             return gzip_decompress.decompress(payload)
 
         # Try to base64 decode
-        try:
-            protobuf = base64.b64decode(payload, validate=True)
-            self._encoder = "base64"
-            return protobuf
-        except Exception as exc:
-            pass
+        #try:
+        #    protobuf = base64.b64decode(payload, validate=True)
+        #    self._encoder = "base64"
+        #    return protobuf
+        #except Exception as exc:
+        #    pass
 
         # try decoding as a gRPC payload: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
         # we're naiively handling only uncompressed payloads
@@ -296,8 +295,10 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         return self._component
 
     def isEnabled(self, content, is_request):
-        """Try to detect a protobuf in the message to enable the tab. Defaults
-        to content-type header of 'x-protobuf'. User overridable
+        """Try to detect a protobuf in the message to enable the tab.
+
+        Defaults to content-type header of 'x-protobuf'. User overridable in
+        `user_funcs.py`
         """
         # TODO implement some more default checks
         if is_request:
@@ -602,8 +603,9 @@ class TypeListListener(ListSelectionListener):
 
 
 class FilteredMessageModel(ListModel, ListDataListener):
-    """listens to a java ListModel and keeps a subset with just valid types
-    for a message"""
+    """Listens to a java ListModel and keeps a subset with just valid types
+    for a message.
+    """
 
     def __init__(self, parent, callbacks):
         self._callbacks = callbacks

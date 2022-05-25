@@ -1,4 +1,21 @@
-"""Methods for easy encoding and decoding of messages"""
+"""The `blackboxprotobuf.lib.api` module provides high level functions for
+decoding and re-encoding protobuf messages.
+
+Most functions take the input data, a type definition and a config object.
+
+The 'message_type' or type definition (typedef) is a blackboxprotobuf specific format
+which defines which types should be used for decoding/encoding each field. It
+is optional for decoding functions but required for encoding funtions. The
+decoding function will return a typedef that is require to re-encode the array.
+If a typedef was provided during decoding, then those types will be used for
+decoding and the typedef return will be the original typedef + any new fields
+in the message.
+
+The config argument is the Config object from `blackboxprotobuf.lib.config` and
+allows reconfiguring default types and stores "known" message typedefs that can
+be referenced within other typedefs. This argument can be left out to use a
+default shared config object.
+"""
 
 # Copyright (c) 2018-2022 NCC Group Plc
 #
@@ -32,8 +49,26 @@ from blackboxprotobuf.lib.exceptions import TypedefException
 
 
 def decode_message(buf, message_type=None, config=None):
-    """Decode a message to a Python dictionary.
-    Returns tuple of (values, types)
+    """Decode a protobuf message and return a python dictionary representing
+    the message.
+
+    Args:
+        buf: Bytes representing an encoded protobuf message
+        message_type: Optional type to use as the base for decoding. Allows for
+            customizing field types or names. Can be a python dictionary or a
+            message type name which maps to the `known_types` dictionary in the
+            config. Defaults to an empty definition '{}'.
+        config: `blackboxprotobuf.lib.config.Config` object which allows
+            customizing default types for wire types and holds the
+            `known_types` array. Defaults to
+            `blackboxprotobuf.lib.config.default` if not provided.
+    Returns:
+        A tuple containing a python dictionary representing the message and a
+        type definition for re-encoding the message.
+
+        The type definition is based on the `message_type` argument if one was
+        provided, but may add additional fields if new fields were encountered
+        during decoding.
     """
 
     if config is None:
@@ -55,8 +90,20 @@ def decode_message(buf, message_type=None, config=None):
 
 
 def encode_message(value, message_type, config=None):
-    """Encodes a python dictionary to a message.
-    Returns a bytearray
+    """Re-encode a python dictionary as a binary protobuf message.
+
+    Args:
+        value: Python dictionary to re-encode to bytes. This should usually be
+            a modified version of the dictionary returned by `decode_message`.
+        message_type: Type definition to use to re-encode the message. This
+            will should generally be the type definition returned from the
+            original `decode_message` call.
+        config: `blackboxprotobuf.lib.config.Config` object which allows
+            customizing default types for wire types and holds the
+            `known_types` array. Defaults to
+            `blackboxprotobuf.lib.config.default` if not provided.
+    Returns:
+        A bytearray containing the encoded protobuf message.
     """
 
     if config is None:
@@ -69,33 +116,73 @@ def encode_message(value, message_type, config=None):
 
 
 def protobuf_to_json(*args, **kwargs):
-    """Encode to python dictionary and dump to JSON.
-    Takes same arguments as decode_message
+    """Decode a protobuf message and return a JSON string representing the
+    message.
+
+    Args:
+        buf: Bytes representing an encoded protobuf message
+        message_type: Optional type to use as the base for decoding. Allows for
+            customizing field types or names. Can be a python dictionary or a
+            message type name which maps to the `known_types` dictionary in the
+            config. Defaults to an empty definition '{}'.
+        config: `blackboxprotobuf.lib.config.Config` object which allows
+            customizing default types for wire types and holds the
+            `known_types` array. Defaults to
+            `blackboxprotobuf.lib.config.default` if not provided.
+    Returns:
+        A tuple containing a JSON string representing the message and a type
+        definition for re-encoding the message.
+
+        The JSON string and type definition are annotated and sorted for
+        readability.
+
+        The type definition is based on the `message_type` argument if one was
+        provided, but may add additional fields if new fields were encountered
+        during decoding.
     """
     value, message_type = decode_message(*args, **kwargs)
-    value = json_safe_transform(
+    value = _json_safe_transform(
         value, message_type, False, config=kwargs.get("config", None)
     )
-    value = sort_output(value, message_type, config=kwargs.get("config", None))
+    value = _sort_output(value, message_type, config=kwargs.get("config", None))
     _annotate_typedef(message_type, value)
     message_type = sort_typedef(message_type)
     return json.dumps(value, indent=2), message_type
 
 
 def protobuf_from_json(json_str, message_type, *args, **kwargs):
-    """Decode JSON string to JSON and then to protobuf.
-    Takes same arguments as encode_message
+    """Re-encode a JSON string as a binary protobuf message.
+
+    Args:
+        json_str: JSON string to re-encode to protobuf message bytes. This
+            should usually be a modified version of the value returned by
+            `protobuf_to_json`.
+        message_type: Type definition to use to re-encode the message. This
+            will should generally be the type definition returned from the
+            original `protobuf_to_json` call.
+        config: `blackboxprotobuf.lib.config.Config` object which allows
+            customizing default types for wire types and holds the
+            `known_types` array. Defaults to
+            `blackboxprotobuf.lib.config.default` if not provided.
+    Returns:
+        A bytearray containing the encoded protobuf message.
     """
     value = json.loads(json_str)
     _strip_typedef_annotations(message_type)
-    value = json_safe_transform(value, message_type, True)
+    value = _json_safe_transform(value, message_type, True)
     return encode_message(value, message_type, *args, **kwargs)
 
 
 def export_protofile(message_types, output_filename):
-    """Export the give messages as ".proto" file.
-    Expects a dictionary with {message_name: typedef} and a filename to
-    write to.
+    """This function attempts to export a set of message type definitions to a
+    `.proto` file for use with other tools.
+
+    Args:
+        message_types: Python dictionary containing the type definitions to
+            export. The dictionary should contain the message type name as the
+            key and the type definition as the value.
+        output_filename: String representing the filename to output the
+            protobuf definition file to.
     """
     blackboxprotobuf.lib.protofile.export_proto(
         message_types, output_filename=output_filename
@@ -103,8 +190,24 @@ def export_protofile(message_types, output_filename):
 
 
 def import_protofile(input_filename, save_to_known=True, config=None):
-    """import ".proto" files and returns the typedef map
-    Expects a filename for the ".proto" file
+    """This function attempts to import a set of message type definitions from a
+    `.proto` file.
+
+    This is a convenience function for `blackboxprotobuf.lib.protofile`. The
+    protobuf file import support is not complete and may fail for some type
+    definitions.
+
+    Args:
+        input_filename: Filename to read the protobuf definitions from.
+        save_to_known: If True, this function will save the message type
+            definitions to `config.known_types`. Otherwise, it will return them
+            to the caller. Defaults to `True`.
+        config: Optional config object which stores the `known_types` map.
+            Defaults to `blackboxprotobuf.lib.config.default`.
+    Returns:
+        If `save_to_known` is False, then the type definitions read from the
+        file are returned as a dictionary, with the type names as the keys and
+        type definitions as the values.
     """
     if config is None:
         config = blackboxprotobuf.lib.config.default
@@ -121,12 +224,31 @@ def import_protofile(input_filename, save_to_known=True, config=None):
 NAME_REGEX = re.compile(r"\A[a-zA-Z][a-zA-Z0-9_]*\Z")
 
 
-def validate_typedef(typedef, old_typedef=None, path=None, config=None):
-    """Validate the typedef format. Optionally validate wiretype of a field
-    number has not been changed
+def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
+    """Attempt to validate a type definition object is valid.
+
+    This function attempts to ensure a type definition is valid before it is
+    used to encode/decode a message. This will make sure the field names are
+    valid and field names/numbers are consistent. It is intended to be called
+    after a user has edited the type definition to ensure the edits are valid.
+
+    Args:
+        typedef: The type definition object to validate. This should be a
+            python dict derived from the dict returned  by a decode function.
+        old_typedef: Optionally provide a old version of the type definition to
+            compare the new type definnition to. If provided, this function
+            will ensure any type changes are valid. For example, a field with a
+            varint type can be changed to other varint types, but not a string
+            or float.
+        config: Optionally provide a config object which contains the
+            `known_types` map to map message type names to known type definitions.
+            Defaults to `blackboxprotobuf.lib.config.default`.
+    Raises:
+        TypedefException: Raises a TypedefException if the provided type
+            definition is not valid.
     """
-    if path is None:
-        path = []
+    if _path is None:
+        _path = []
     if config is None:
         config = blackboxprotobuf.lib.config.default
 
@@ -142,7 +264,7 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
             raise TypedefException("Field number must be a digit: %s" % field_number)
         field_number = str(field_number)
 
-        field_path = path[:]
+        field_path = _path[:]
         field_path.append(field_number)
 
         # Check for duplicate field numbers
@@ -238,14 +360,14 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
             # Recursively validate inner typedefs
             if key in ["message_typedef", "group_typedef"]:
                 if old_typedef is None:
-                    validate_typedef(value, path=field_path, config=config)
+                    validate_typedef(value, _path=field_path, config=config)
                 else:
                     validate_typedef(
-                        value, old_typedef[field_number][key], path=field_path
+                        value, old_typedef[field_number][key], _path=field_path
                     )
             if key == "alt_typedefs":
                 for alt_field_number, alt_typedef in value.items():
-                    validate_typedef(alt_typedef, path=field_path, config=config)
+                    validate_typedef(alt_typedef, _path=field_path, config=config)
 
     if old_typedef is not None:
         wiretype_map = {}
@@ -254,7 +376,7 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
                 int(field_number)
             ] = blackboxprotobuf.lib.types.type_maps.WIRETYPES[value["type"]]
         for field_number, value in typedef.items():
-            field_path = path[:]
+            field_path = _path[:]
             field_path.append(str(field_number))
             if int(field_number) in wiretype_map:
                 old_wiretype = wiretype_map[int(field_number)]
@@ -272,9 +394,9 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
                     )
 
 
-def json_safe_transform(values, typedef, toBytes, config=None):
-    """JSON doesn't handle bytes type well. We want to go through and encode
-    every bytes type as latin1 to get a semi readable text"""
+def _json_safe_transform(values, typedef, toBytes, config=None):
+    # JSON doesn't handle bytes type well. We want to go through and encode
+    # every bytes type as latin1 to get a semi readable text
 
     if config is None:
         config = blackboxprotobuf.lib.config.default
@@ -321,7 +443,7 @@ def json_safe_transform(values, typedef, toBytes, config=None):
                 else:
                     field_values[i] = field_value.decode("latin1")
             elif field_type == "message":
-                field_values[i] = json_safe_transform(
+                field_values[i] = _json_safe_transform(
                     field_value,
                     field_typedef,
                     toBytes,
@@ -353,9 +475,9 @@ def _get_typedef_for_message(field_typedef, config):
         )
 
 
-def sort_output(value, typedef, config=None):
-    """Sort output by the field number in the typedef. Helps with readability
-    in a JSON dump"""
+def _sort_output(value, typedef, config=None):
+    # Sort output by the field number in the typedef. Helps with readability in
+    # a JSON dump
     output_dict = collections.OrderedDict()
     if config is None:
         config = blackboxprotobuf.lib.config.default
@@ -401,14 +523,14 @@ def sort_output(value, typedef, config=None):
 
             if field_type == "message":
                 if not isinstance(value[field_name], list):
-                    output_dict[field_name] = sort_output(
+                    output_dict[field_name] = _sort_output(
                         value[field_name], field_message_typedef
                     )
                 else:
                     output_dict[field_name] = []
                     for field_value in value[field_name]:
                         output_dict[field_name].append(
-                            sort_output(field_value, field_message_typedef)
+                            _sort_output(field_value, field_message_typedef)
                         )
             else:
                 output_dict[field_name] = value[field_name]
@@ -417,7 +539,20 @@ def sort_output(value, typedef, config=None):
 
 
 def sort_typedef(typedef):
-    """Sort output by field number and sub_keys so name then type is first"""
+    """Apply special sorting rules to the type definition to improve readability.
+
+    Sorts the fields of a type definition so that important fields such as the
+    'type' or 'name' are at the top and don't get buried beneath longer fields
+    like 'message_typedef'. This will also sort the keys of the
+    'message_typedef' based on the field number.
+    Args:
+        typedef - dictionary representing a Blackboxprotobuf type definition
+    Returns:
+        A new OrderedDict object containing the contents of the typedef
+        argument sorted for readability.
+    """
+
+    # Sort output by field number and sub_keys so name then type is first
 
     TYPEDEF_KEY_ORDER = [
         "name",
@@ -446,8 +581,8 @@ def sort_typedef(typedef):
 
 
 def _annotate_typedef(typedef, message):
-    """Add values from message into the typedef so it's easier to figure out
-    which field when you're editing manually"""
+    # Add values from message into the typedef so it's easier to figure out
+    # which field when you're editing manually
 
     for field_number, field_def in typedef.items():
         field_value = None
@@ -469,7 +604,7 @@ def _annotate_typedef(typedef, message):
 
 
 def _strip_typedef_annotations(typedef):
-    """Remove example values placed by _annotate_typedef"""
+    # Remove example values placed by _annotate_typedef
     for _, field_def in typedef.items():
         if "example_value_ignored" in field_def:
             del field_def["example_value_ignored"]

@@ -38,6 +38,7 @@ from blackboxprotobuf.lib.exceptions import (
 
 
 def encode_string(value):
+    """Encode a string as a length delimited byte array"""
     try:
         value = six.ensure_text(value)
     except TypeError as exc:
@@ -48,9 +49,7 @@ def encode_string(value):
 
 
 def encode_bytes(value):
-    """Encode varint length followed by the string.
-    This should also work to encode incoming string values.
-    """
+    """Encode a length delimited byte array"""
     if isinstance(value, bytearray):
         value = bytes(value)
     try:
@@ -63,12 +62,12 @@ def encode_bytes(value):
     return encoded_length + value
 
 
-def decode_bytes(value, pos):
-    """Decode varint for the length and then returns that number of bytes"""
-    length, pos = varint.decode_varint(value, pos)
+def decode_bytes(buf, pos):
+    """Decode a length delimited bytes array from buf"""
+    length, pos = varint.decode_varint(buf, pos)
     end = pos + length
     try:
-        return value[pos:end], end
+        return buf[pos:end], end
     except IndexError as exc:
         six.raise_from(
             DecoderException(
@@ -76,16 +75,14 @@ def decode_bytes(value, pos):
                     "Error decoding bytes. Decoded length %d is longer than bytes"
                     " available %d"
                 )
-                % (length, len(value) - pos)
+                % (length, len(buf) - pos)
             ),
             exc,
         )
 
 
 def encode_bytes_hex(value):
-    """Encode varint length followed by the string.
-    Expects a string of hex characters
-    """
+    """Encode a length delimited byte array represented by a hex string"""
     try:
         return encode_bytes(binascii.unhexlify(value))
     except (TypeError, binascii.Error) as exc:
@@ -95,15 +92,13 @@ def encode_bytes_hex(value):
 
 
 def decode_bytes_hex(buf, pos):
-    """Decode varint for length and then returns that number of bytes.
-    Outputs the bytes as a hex value
-    """
+    """Decode a length delimited byte array from buf and return a hex encoded string"""
     value, pos = decode_bytes(buf, pos)
     return binascii.hexlify(value), pos
 
 
 def decode_string(value, pos):
-    """Decode varint for length and then the bytes"""
+    """Decode a length delimited byte array as a string"""
     length, pos = varint.decode_varint(value, pos)
     end = pos + length
     try:
@@ -116,11 +111,7 @@ def decode_string(value, pos):
 
 
 def encode_message(data, config, typedef, path=None, field_order=None):
-    """Encode a Python dictionary representing a protobuf message
-    data - Python dictionary mapping field numbers to values
-    typedef - Type information including field number, field name and field type
-    This will throw an exception if an unkown value is used as a key
-    """
+    """Encode a Python dictionary to a binary protobuf message"""
     output = bytearray()
     if path is None:
         path = []
@@ -160,6 +151,11 @@ def encode_message(data, config, typedef, path=None, field_order=None):
 def _encode_message_field(
     config, typedef, path, field_number, value, selected_index=None, skiplist=None
 ):
+    # Encodes a single field of a message to the byte array
+    # If selected_index is passed, it will only encode a single element if value is a list
+    # If skiplist is passed, it should be in the form of (field_number,index)
+    # and this will skip encoding those elements
+
     # Get the field number convert it as necessary
     alt_field_number = None
 
@@ -283,7 +279,7 @@ def _encode_message_field(
 
 
 def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=None):
-    """Decode a protobuf message with no length delimiter"""
+    """Decode a protobuf message with no length prefix"""
     if end is None:
         end = len(buf)
 
@@ -364,16 +360,15 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
 
 
 def _group_by_number(buf, pos, end, path):
-    """Parse through the whole message and split into buffers based on wire
-    type and organized by field number. This forces us to parse the whole
-    message at once, but I think we're doing that anyway. This catches size
-    errors early as well, which is usually the best indicator of if it's a
-    protobuf message or not.
-    Returns a dictionary like:
-        {
-            "2": (<wiretype>, [<data>])
-        }
-    """
+    # Parse through the whole message and split into buffers based on wire
+    # type and organized by field number. This forces us to parse the whole
+    # message at once, but I think we're doing that anyway. This catches size
+    # errors early as well, which is usually the best indicator of if it's a
+    # protobuf message or not.
+    # Returns a dictionary like:
+    #     {
+    #         "2": (<wiretype>, [<data>])
+    #     }
 
     output_map = {}
     field_order = []
@@ -435,7 +430,7 @@ def _group_by_number(buf, pos, end, path):
 
 
 def _get_field_key(field_number, typedef, path):
-    """Translate a field_number into a name if one is available in the typedef"""
+    # Translate a field_number into a name if one is available in the typedef
     if not isinstance(field_number, (int, str)):
         raise EncoderException("Field key in message must be a str or int", path=path)
     if isinstance(field_number, int):
@@ -599,7 +594,7 @@ def _try_decode_lendelim_fields(
 
 
 def encode_lendelim_message(data, config, typedef, path=None, field_order=None):
-    """Encode the length before the message"""
+    """Encode data as a length delimited protobuf message"""
     message_out = encode_message(
         data, config, typedef, path=path, field_order=field_order
     )
@@ -609,7 +604,7 @@ def encode_lendelim_message(data, config, typedef, path=None, field_order=None):
 
 
 def decode_lendelim_message(buf, config, typedef=None, pos=0, depth=0, path=None):
-    """Read in the length and use it as the end"""
+    """Deocde a length delimited protobuf message from buf"""
     length, pos = varint.decode_varint(buf, pos)
     ret = decode_message(
         buf, config, typedef, pos, pos + length, depth=depth, path=path
@@ -618,10 +613,10 @@ def decode_lendelim_message(buf, config, typedef=None, pos=0, depth=0, path=None
 
 
 def generate_packed_encoder(wrapped_encoder):
-    """Generate an encoder for a packed type from the base type encoder"""
+    """Generate an encoder for a packed type based on a base type encoder"""
 
     def length_wrapper(values):
-        """Encode repeat values and prefix with the length"""
+        # Encode repeat values and prefix with the length
         output = bytearray()
         for value in values:
             output += wrapped_encoder(value)
@@ -632,10 +627,10 @@ def generate_packed_encoder(wrapped_encoder):
 
 
 def generate_packed_decoder(wrapped_decoder):
-    """Generate an decoder for a packer type from a base type decoder"""
+    """Generate an decoder for a packed type based on a base type decoder"""
 
     def length_wrapper(buf, pos):
-        """Decode repeat values prefixed with the length"""
+        # Decode repeat values prefixed with the length
         length, pos = varint.decode_varint(buf, pos)
         end = pos + length
         output = []

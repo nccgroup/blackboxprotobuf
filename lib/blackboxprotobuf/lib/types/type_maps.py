@@ -1,5 +1,5 @@
 """Contains various maps for protobuf types, including encoding/decoding
-   functions, wiretypes and default types
+functions, wiretypes and default types
 """
 
 # Copyright (c) 2018-2022 NCC Group Plc
@@ -25,6 +25,7 @@
 from google.protobuf.internal import wire_format
 from blackboxprotobuf.lib.types import varint, fixed, length_delim
 
+# Map a blackboxprotobuf type to specific encoder
 ENCODERS = {
     "uint": varint.encode_uvarint,
     "int": varint.encode_varint,
@@ -49,6 +50,7 @@ ENCODERS = {
     "packed_double": length_delim.generate_packed_encoder(fixed.encode_double),
 }
 
+# Map a blackboxprotobuf type to specific decoder
 DECODERS = {
     "uint": varint.decode_uvarint,
     "int": varint.decode_varint,
@@ -99,6 +101,8 @@ WIRETYPES = {
     "packed_double": wire_format.WIRETYPE_LENGTH_DELIMITED,
 }
 
+# Default values to use when decoding each wire type
+# length delimited is special and handled in the length_delim module
 WIRE_TYPE_DEFAULTS = {
     wire_format.WIRETYPE_VARINT: "int",
     wire_format.WIRETYPE_FIXED32: "fixed32",

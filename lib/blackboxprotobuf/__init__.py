@@ -1,5 +1,13 @@
-"""This module provides generic functions for encoding and decoding protobuf's
-   to python dictionaries or JSON
+"""`blackboxprotobuf` provides APIs for decoding and encoding binary protobuf
+messages.
+
+This module re-exports the functions defined in `blackboxprotobuf.lib.api`,
+which provides a high level interface and convenience functions.
+
+This module is split into two submodules:
+
+    - The `lib` submodule contains the decoding/encoding logic and provides a python interface.
+    - The `burp` submodule defines the Burp Suite plugin and UI.
 """
 
 # Copyright (c) 2018-2022 NCC Group Plc

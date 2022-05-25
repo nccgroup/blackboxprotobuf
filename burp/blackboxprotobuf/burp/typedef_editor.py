@@ -1,5 +1,5 @@
 """Contains classes for a window for editing type definitions. Called from both
-   the message editor tab and from the suite tabs.
+the message editor tab and from the suite tabs.
 """
 
 # Copyright (c) 2018-2022 NCC Group Plc

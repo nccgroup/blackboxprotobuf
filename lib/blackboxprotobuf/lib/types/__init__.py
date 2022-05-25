@@ -1,5 +1,7 @@
-"""This module contains classes/methods for decoding individual types. Grouped
-   into general categories of wire type
+"""This module contains classes/methods for decoding individual field types.
+
+Grouped into submodules based on wire type.
+Re-exports type_maps items for easier access.
 """
 
 # Copyright (c) 2018-2022 NCC Group Plc

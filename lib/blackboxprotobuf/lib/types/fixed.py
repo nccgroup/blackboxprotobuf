@@ -1,4 +1,4 @@
-""" Functions for encoding and decoding fixed size structs """
+"""Functions for encoding and decoding fixed size integers and floats"""
 
 # Copyright (c) 2018-2022 NCC Group Plc
 #
