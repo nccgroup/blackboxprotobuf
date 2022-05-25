@@ -40,12 +40,14 @@ def test_message_json_inverse(x):
     decoded_json, typedef_out = blackboxprotobuf.protobuf_to_json(
         encoded, config=config, message_type=typedef
     )
+    blackboxprotobuf.validate_typedef(typedef_out)
     encoded_json = blackboxprotobuf.protobuf_from_json(
         decoded_json, config=config, message_type=typedef_out
     )
     decoded, typedef_out = blackboxprotobuf.decode_message(
         encoded_json, config=config, message_type=typedef
     )
+    blackboxprotobuf.validate_typedef(typedef_out)
     assert isinstance(encoded, bytearray)
     assert isinstance(decoded, dict)
     assert message == decoded
@@ -66,6 +68,7 @@ def test_anon_json_decode(x):
     decoded_json, typedef_out = blackboxprotobuf.protobuf_to_json(
         encoded, config=config
     )
+    blackboxprotobuf.validate_typedef(typedef_out)
     note("To Json Typedef: %r" % dict(typedef_out))
     encoded_json = blackboxprotobuf.protobuf_from_json(
         decoded_json, config=config, message_type=typedef_out
@@ -73,6 +76,7 @@ def test_anon_json_decode(x):
     decoded, typedef_out = blackboxprotobuf.decode_message(
         encoded_json, config=config, message_type=typedef
     )
+    blackboxprotobuf.validate_typedef(typedef_out)
     note("Original message: %r" % message)
     note("Decoded JSON: %r" % decoded_json)
     note("Decoded message: %r" % decoded)

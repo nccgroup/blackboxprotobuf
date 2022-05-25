@@ -77,6 +77,7 @@ def test_decode(x):
         setattr(message, key, value)
     encoded = message.SerializeToString()
     decoded, typedef = blackboxprotobuf.decode_message(encoded, testMessage_typedef)
+    blackboxprotobuf.validate_typedef(typedef)
     hypothesis.note("Decoded: %r" % decoded)
     for key in decoded.keys():
         assert x[key] == decoded[key]
@@ -106,6 +107,7 @@ def test_modify(x, modify_num):
         setattr(message, key, value)
     encoded = message.SerializeToString()
     decoded, typedef = blackboxprotobuf.decode_message(encoded, testMessage_typedef)
+    blackboxprotobuf.validate_typedef(typedef)
 
     # eliminate any cases where protobuf defaults out a field
     hypothesis.assume(modify_key in decoded)
@@ -153,6 +155,7 @@ def test_decode_json(x):
     decoded_json, typedef_json = blackboxprotobuf.protobuf_to_json(
         encoded, testMessage_typedef
     )
+    blackboxprotobuf.validate_typedef(typedef_json)
     hypothesis.note("Encoded JSON:")
     hypothesis.note(decoded_json)
     decoded = json.loads(decoded_json)
@@ -212,6 +215,7 @@ def test_modify_json(x, modify_num):
     decoded_json, typedef = blackboxprotobuf.protobuf_to_json(
         encoded, testMessage_typedef
     )
+    blackboxprotobuf.validate_typedef(typedef)
     decoded = json.loads(decoded_json)
 
     # eliminate any cases where protobuf defaults out a field
