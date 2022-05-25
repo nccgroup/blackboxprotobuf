@@ -395,8 +395,22 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
 
 
 def _json_safe_transform(values, typedef, toBytes, config=None):
-    # JSON doesn't handle bytes type well. We want to go through and encode
-    # every bytes type as latin1 to get a semi readable text
+    # Python's JSON doesn't have a default way to handle 'bytes' types. To
+    # handle this, we want some string like encoding which JSON can handle but
+    # can also handle arbitrary bytes. This method get's more complicated than
+    # just converting all bytes since on re-encoding we need to know which ones
+    # were transformed and which are supposed to actually be strings
+
+    # A built-for binary encoding method like hex or base64 would be 'proper',
+    # but doesn't really give any information to a reader. In some cases, a
+    # binary blob may have embedded strings or integer values that would be
+    # beneficial to quickly skim.
+
+    # This uses latin1 encoding because it can handle arbitrary bytes, prints
+    # ASCII characters and can be decoded back to the same exact byte string.
+    # It's possible I missed another encoding method that matches these
+    # properties across python2.7 and python3.9, but had issues with some other
+    # backslash escape mechanisms parsing back to bytes.
 
     if config is None:
         config = blackboxprotobuf.lib.config.default
