@@ -1,5 +1,4 @@
-"""
-Python methods for importing and exporting '.proto' files from the BBP type
+""" Python methods for importing and exporting '.proto' files from the BBP type
 definition format.
 """
 

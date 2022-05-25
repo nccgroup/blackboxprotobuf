@@ -1,5 +1,7 @@
-# These functions allow functionality within the Blackbox protobuf extension
-# to be customized in order to handle undefined behavior.
+"""These functions provide hooks into the blackboxprotobuf Burp extension,
+allowing certain functionality to be customized in order to handle non-standard
+applications.
+"""
 
 # Copyright (c) 2018-2022 NCC Group Plc
 #
@@ -22,7 +24,7 @@
 # SOFTWARE.
 
 
-# Common parameters:
+# Documentation for Common parameters:
 #   content -- Binary content of the request
 #   is_request -- boolean, True for a request, False for a response
 #   content_info -- RequestInfo or ResponseInfo object, See
@@ -53,16 +55,28 @@
 
 
 def detect_protobuf(content, is_request, content_info, helpers):
-    """Customize protobuf detection. Passes in request. Should return True,
-    False, or None (to use default detection)"""
+    """Customize protobuf detection with a request or a response. Should return True if it is a protobuf,
+    False if it definitely not a protobuf and should not try to decode, or None
+    to fallback to the standard content-type header detection.
+
+    This can be used to add protobuf detection based on different headers or
+    customer application functionality. You can also use "return True" to try
+    to decode every request/response.
+    """
     pass
 
 
 def get_protobuf_data(
     content, is_request, content_info, helpers, request=None, request_content_info=None
 ):
-    """Customize how the protobuf data is retrieved from the request. For
-    example, in a parameter or encoded."""
+    """Customize how the protobuf data is retrieved from the request. By
+    default, it is assumed the body of the request/response contains a
+    protobuf payload and tries to detect if it's compressed.
+
+    This function can be used if the payload is in a non-standard location or
+    has a non-standard encoding. It should return the raw protobuf bytes from
+    the message.
+    """
     pass
 
 
@@ -75,16 +89,34 @@ def set_protobuf_data(
     request=None,
     request_content_info=None,
 ):
-    """Customize how the protobuf data is set in request/response. For example,
-    in a parameter or encoded. Should mirror get_protobuf_data"""
+    """Customize how the protobuf data is set in request/response. This
+    function is used to configure where in the request the protobuf data is
+    placed and how it is encoded if the message is modified. For example, this
+    could set a query parameter with base64 encoded data if that is what the
+    application expects. This function is the mirror to `get_protobuf_data` and
+    if one function is modified, then the other should as well.
+
+    This is expected to return bytes representing the HTTP headers and body,
+    such as that returned by the `buildHttpMessage` function of the Burp
+    helpers
+    (https://portswigger.net/burp/extender/api/burp/iextensionhelpers.html#buildHttpMessage)
+    """
     pass
 
 
 def hash_message(
     content, is_request, content_info, helpers, request=None, request_content_info=None
 ):
-    """Customize how a request is identified for type definition saving. Two
-    requests will use the same type definition if this function returns the
-    same value. Should return a string value.
+    """Blackbox protobuf remembers which type definition to use for each
+    request/response by saving them in a dictionary, keyed by a 'message hash'.
+    If a message has the same hash, it will try to re-use the same type
+    definition. By default, this is the request path and true or false
+    depending whether it is a request or response.
+
+    If there isn't a one-to-one mapping of message types to URLs, then this
+    function can be used to customize what parts of the request to use for
+    identification (eg. a message type header or parameter).
+
+    This function should return a string.
     """
     pass

@@ -1,4 +1,4 @@
-""" Tests similar to the length_delim or protobuf tests, but make sure we can round trip through the JSON encode/decode """
+"""Tests similar to the length_delim or protobuf tests, but make sure we can round trip through the JSON encode/decode """
 
 # Copyright (c) 2018-2022 NCC Group Plc
 #
