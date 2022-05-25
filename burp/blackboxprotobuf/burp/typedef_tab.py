@@ -236,8 +236,8 @@ class TypeDefinitionButtonListener(ActionListener):
 
             file_name = chooser.getSelectedFile().getCanonicalPath()
             ext = os.path.splitext(file_name)[1]
-            if ext == "":
-                # No extension, add .json
+            if ext != ".json":
+                # Add json extension if it doesn't have one
                 file_name += ".json"
 
             with open(file_name, "w+") as selected_file:
