@@ -326,7 +326,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
                         field_path,
                     )
             # Check for duplicate names
-            if key == "name":
+            if key == "name" and value.strip() != "":
                 if value.lower() in field_names:
                     raise TypedefException(
                         ('Duplicate field name "%s" for field ' "number %s")
@@ -419,7 +419,7 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
     name_map = {
         item["name"]: number
         for number, item in typedef.items()
-        if item.get("name", None)
+        if ("name" in item and item["name"] != "")
     }
     if not isinstance(values, dict):
         # this function should only ever be called on a message, error out if
@@ -628,6 +628,10 @@ def _annotate_typedef(typedef, message):
             else:
                 field_def["example_value_ignored"] = field_value
 
+        # Add a blank name field if the field doesn't have one, so it's easier
+        # to add
+        if 'name' not in field_def:
+            field_def['name'] = ""
 
 def _strip_typedef_annotations(typedef):
     # Remove example values placed by _annotate_typedef

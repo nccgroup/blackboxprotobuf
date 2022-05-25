@@ -168,7 +168,7 @@ def _encode_message_field(
         if "-" in field_number:
             field_number, alt_field_number = field_number.split("-")
         for number, info in typedef.items():
-            if "name" in info and info["name"] == field_number and field_number != "":
+            if info.get("name", "") != ""  and info["name"] == field_number and field_number != "":
                 field_number = number
                 break
     else:
@@ -443,7 +443,7 @@ def _get_field_key(field_number, typedef, path):
     if "-" in field_number:
         field_number, alt_field_number = field_number.split("-")
 
-    if field_number in typedef and "name" in typedef[field_number]:
+    if field_number in typedef and typedef[field_number].get("name", "") != "":
         field_key = typedef[field_number]["name"]
     else:
         field_key = field_number
