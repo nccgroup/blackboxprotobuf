@@ -1,35 +1,34 @@
-"""These functions allow functionality within the Blackbox protobuf extension
-   to be customized in order to handle undefined behavior.
+# These functions allow functionality within the Blackbox protobuf extension
+# to be customized in order to handle undefined behavior.
 
-    Common parameters:
-        content -- Binary content of the request
-        is_request -- boolean, True for a request, False for a response
-        content_info -- RequestInfo or ResponseInfo object, See
-            https://portswigger.net/Burp/extender/api/burp/IRequestInfo.html and
-            https://portswigger.net/Burp/extender/api/burp/IResponseInfo.html
-        helpers -- Burp extension helpers,
-            https://portswigger.net/Burp/extender/api/burp/IExtensionHelpers.html
-        request/request_content_info -- If called on a response, send the
-            corresponding request (useful for retrieving URL parameters)
+# Common parameters:
+#   content -- Binary content of the request
+#   is_request -- boolean, True for a request, False for a response
+#   content_info -- RequestInfo or ResponseInfo object, See
+#       https://portswigger.net/Burp/extender/api/burp/IRequestInfo.html and
+#       https://portswigger.net/Burp/extender/api/burp/IResponseInfo.html
+#   helpers -- Burp extension helpers,
+#       https://portswigger.net/Burp/extender/api/burp/IExtensionHelpers.html
+#   request/request_content_info -- If called on a response, send the
+#       corresponding request (useful for retrieving URL parameters)
 
-    Useful functionality:
-        URL parameters:
-            for param in content_info.getParmeters():
-                if param.getName() == 'type':
-                    ...
-        Headers:
-            if 'content-type' in content_info.getHeaders():
-                ...
-        Request Body:
-            body = content[content_info.getBodyOffset():].tostring()
-        Setting paramater:
-            import burp.IParameter
-            body = helpers.updateParameter(
-                        content,
-                        helpers.buildParameter('message',
-                                               protobuf_data,
-                                               IParameter.PARAM_URL))
-"""
+# Useful functionality:
+#    URL parameters:
+#        for param in content_info.getParmeters():
+#            if param.getName() == 'type':
+#                ...
+#    Headers:
+#        if 'content-type' in content_info.getHeaders():
+#            ...
+#    Request Body:
+#       body = content[content_info.getBodyOffset():].tostring()
+#    Setting paramater:
+#       import burp.IParameter
+#       body = helpers.updateParameter(
+#                   content,
+#                   helpers.buildParameter('message',
+#                                          protobuf_data,
+#                                          IParameter.PARAM_URL))
 
 
 def detect_protobuf(content, is_request, content_info, helpers):
