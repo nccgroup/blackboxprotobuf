@@ -10,8 +10,8 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
     echo "export PATH=/home/vagrant/.local/bin/:$PATH" >> /home/vagrant/.bashrc
     sudo apt-get update
-    sudo apt-get install -y protobuf-compiler python2 python3-pip
-    pip3 install poetry
+    sudo apt-get install -y protobuf-compiler python2 python3-pip jython
+    pip3 install poetry tox
     cd blackboxprotobuf/lib
     poetry env use python2 && poetry install --no-root
     poetry env use python3 && poetry install --no-root
