@@ -12,6 +12,9 @@ Vagrant.configure("2") do |config|
     sudo apt-get update
     sudo apt-get install -y protobuf-compiler python2 python3-pip jython
     pip3 install poetry tox
+  SHELL
+
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
     cd blackboxprotobuf/lib
     poetry env use python2 && poetry install --no-root
     poetry env use python3 && poetry install --no-root
