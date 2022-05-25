@@ -25,7 +25,6 @@ except:
     )
     import Test_pb2
 
-# TODO: need to find a different way to generate protobuf messages off of this
 testMessage_typedef = {
     "1": {"type": "double", "name": "testDouble"},
     "2": {"type": "float", "name": "testFloat"},

@@ -116,7 +116,6 @@ def encode_message(data, config, typedef, path=None):
         if isinstance(field_number, string_types):
             if "-" in field_number:
                 field_number, alt_field_number = field_number.split("-")
-            # TODO can refactor to cache the name to number mapping
             for number, info in typedef.items():
                 if (
                     "name" in info
@@ -220,11 +219,9 @@ def encode_message(data, config, typedef, path=None):
 
 def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=None):
     """Decode a protobuf message with no length delimiter"""
-    # TODO recalculate and re-add path for errors
     if end is None:
         end = len(buf)
 
-    logging.debug("End: %d", end)
     if typedef is None:
         typedef = {}
     else:
@@ -302,9 +299,11 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
 
 
 def _group_by_number(buf, pos, end, path):
-    """Parse through the whole message and return buffers based on wire type.
-    This forces us to parse the whole message at once, but I think we're
-    doing that anyway.
+    """Parse through the whole message and split into buffers based on wire
+    type and organized by field number. This forces us to parse the whole
+    message at once, but I think we're doing that anyway. This catches size
+    errors early as well, which is usually the best indicator of if it's a
+    protobuf message or not.
     Returns a dictionary like:
         {
             "2": (<wiretype>, [<data>])
@@ -383,21 +382,19 @@ def _group_by_number(buf, pos, end, path):
 
 
 def _get_field_key(field_number, typedef, path):
-    """If field_number has a name, then use that"""
+    """Translate a field_number into a name if one is available in the typedef"""
     if not isinstance(field_number, (int, str)):
-        # Should only get unpredictable inputs from encoding
         raise EncoderException("Field key in message must be a str or int", path=path)
     if isinstance(field_number, int):
         field_number = str(field_number)
+
+    # handle an alt_typedef by transforming 1-1 to name-1
+    # I don't think should actually be used with the current uses of
+    # _get_field_key
     alt_field_number = None
     if "-" in field_number:
         field_number, alt_field_number = field_number.split("-")
-        # TODO
-        raise NotImplementedError(
-            "Handling for _get_field_key not implemented for alt typedefs: %s"
-            % field_number,
-            path=path,
-        )
+
     if field_number in typedef and "name" in typedef[field_number]:
         field_key = typedef[field_number]["name"]
     else:
@@ -415,10 +412,10 @@ def _try_decode_lendelim_fields(
     # not.
     # Unlike other types, we can't assume our message types are
     # consistent across the tree or even within the same message.
-    # A type could be a bytes type that might decode to different
+    # A field could be a bytes type that that decodes to multiple different
     # messages that don't have the same type definition. This is where
-    # 'alt_typedefs' let us say, these are the different message types we've
-    # seen for this one field.
+    # 'alt_typedefs' let us say that these are the different message types
+    # we've seen for this one field.
     # In general, if something decodes as a message once, the rest should too
     # and we can enforce that across a single message, but not multiple
     # messages.

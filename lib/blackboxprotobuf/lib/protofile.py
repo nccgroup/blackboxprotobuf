@@ -79,7 +79,6 @@ def _print_message(message_name, typedef, output_file, depth=0):
     output_file.write(indent)
     output_file.write(u"message %s {\n" % message_name)
     for field_number, field_typedef in typedef.items():
-        # TODO Default to all fields as repeated? or optional
         proto_type = None
         field_name = None
         field_options = ""
@@ -207,7 +206,7 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
             package_prefix = PACKAGE_REGEX.match(line).group(1) + "."
 
         elif line.startswith("import"):
-            logging.warn(
+            logging.warning(
                 "Proto file has import which is not supported "
                 "by the parser. Ensure the imported files are "
                 "processed first: %s",
@@ -223,7 +222,6 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
 
         line = input_file.readline()
 
-    # TODO parse the message data
     for tree in message_trees:
         new_message_names, new_enum_names = _collect_names(package_prefix, tree)
         enum_names += new_enum_names
@@ -369,7 +367,6 @@ def _parse_message(
     typdef_map[message_name] = message_typedef
 
     for inner_message in message_tree["inner_messages"]:
-        # TODO prefix should be added to?
         _parse_message(
             inner_message,
             typdef_map,

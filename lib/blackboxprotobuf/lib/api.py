@@ -34,7 +34,6 @@ def decode_message(buf, message_type=None, config=None):
     return value, typedef
 
 
-# TODO add explicit validation of values to message type
 def encode_message(value, message_type, config=None):
     """Encodes a python dictionary to a message.
     Returns a bytearray
@@ -225,7 +224,6 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
                     )
             if key == "alt_typedefs":
                 for alt_field_number, alt_typedef in value.items():
-                    # TODO validate alt_typedefs against old typedefs?
                     validate_typedef(alt_typedef, path=field_path, config=config)
 
     if old_typedef is not None:
@@ -412,7 +410,6 @@ def sort_typedef(typedef):
                 del field_def[key]
         for key, value in field_def.items():
 
-            # TODO handle alt typedefs
             if key == "message_typedef":
                 output_field_def[key] = sort_typedef(value)
             else:
@@ -434,7 +431,6 @@ def _annotate_typedef(typedef, message):
         if field_name in message:
             field_value = message[field_name]
 
-            # TODO handle alt typedefs
             if field_def["type"] == "message":
                 if isinstance(field_value, list):
                     for value in field_value:
