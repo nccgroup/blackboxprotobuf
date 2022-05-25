@@ -48,7 +48,7 @@ def decode_message(buf, message_type=None, config=None):
         else:
             message_type = config.known_types[message_type]
 
-    value, typedef, _ = blackboxprotobuf.lib.types.length_delim.decode_message(
+    value, typedef, _, _ = blackboxprotobuf.lib.types.length_delim.decode_message(
         buf, config, message_type
     )
     return value, typedef
@@ -168,6 +168,7 @@ def validate_typedef(typedef, old_typedef=None, path=None, config=None):
         valid_type_fields = [
             "type",
             "name",
+            "field_order",
             "message_typedef",
             "message_type_name",
             "alt_typedefs",
@@ -418,7 +419,13 @@ def sort_output(value, typedef, config=None):
 def sort_typedef(typedef):
     """Sort output by field number and sub_keys so name then type is first"""
 
-    TYPEDEF_KEY_ORDER = ["name", "type", "message_type_name", "example_value_ignored"]
+    TYPEDEF_KEY_ORDER = [
+        "name",
+        "type",
+        "message_type_name",
+        "example_value_ignored",
+        "field_order",
+    ]
     output_dict = collections.OrderedDict()
 
     for field_number, field_def in sorted(typedef.items(), key=lambda t: int(t[0])):

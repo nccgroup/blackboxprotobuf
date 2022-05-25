@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from hypothesis import given
+from hypothesis import given, example, note
 import hypothesis.strategies as st
 import strategies
 
@@ -34,6 +34,8 @@ def test_uvarint_inverse(x):
 
 
 @given(x=strategies.input_map["int"])
+@example(x=-1143843382522404608)
+@example(x=-1)
 def test_varint_inverse(x):
     encoded = varint.encode_varint(x)
     decoded, pos = varint.decode_varint(encoded, 0)

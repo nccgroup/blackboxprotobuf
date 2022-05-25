@@ -58,6 +58,7 @@ def encode_uvarint(value):
 
 def decode_uvarint(buf, pos):
     """Decode bytearray into a long."""
+    pos_start = pos
     # Convert buffer to string
     if six.PY2:
         buf = str(buf)
@@ -70,6 +71,18 @@ def decode_uvarint(buf, pos):
                 % binascii.hexlify(buf[pos : pos + 8])
             ),
             exc,
+        )
+    if six.indexbytes(buf, pos - 1) == 0x00 and (pos - pos_start) > 1:
+        raise DecoderException(
+            "Non standard varint encoding: %r" % binascii.hexlify(buf[pos_start:pos])
+        )
+    if (pos - pos_start) >= 10 and six.indexbytes(buf, pos - 1) != 0x01:
+        # math here might be wrong, but it seems like the max value in uint
+        # after it's been masked will have 0x01 as the last byte anything
+        # greater (or less) is a non-standard encoding
+        raise DecoderException(
+            "Non standard signed varint encoding: %r"
+            % binascii.hexlify(buf[pos_start:pos])
         )
     return (value, pos)
 
@@ -91,6 +104,7 @@ def encode_varint(value):
 def decode_varint(buf, pos):
     """Decode bytearray into a long."""
     # Convert buffer to string
+    pos_start = pos
     if six.PY2:
         buf = str(buf)
     try:
@@ -102,6 +116,24 @@ def decode_varint(buf, pos):
                 % binascii.hexlify(buf[pos : pos + 8])
             ),
             exc,
+        )
+    # Throw an error for a non-canonical representation. It would be nice to be
+    # as flexible as possible when possible, but we also want to make sure
+    # encode(decode(x)) == x for any x so that mis-parsing bytes as a message
+    # doesn't change the bytes. Maybe have a way to turn off these checks via a
+    # flag? We shouldn't really ever get a non-canonical representation from a
+    # real protobuf representation
+    if six.indexbytes(buf, pos - 1) == 0x00 and (pos - pos_start) > 1:
+        raise DecoderException(
+            "Non standard varint encoding: %r" % binascii.hexlify(buf[pos_start:pos])
+        )
+    if value < 0 and six.indexbytes(buf, pos - 1) != 0x01:
+        # math here might be wrong, but it seems like the max value in uint
+        # after it's been masked will have 0x01 as the last byte anything
+        # greater (or less) is a non-standard encoding
+        raise DecoderException(
+            "Non standard signed varint encoding: %r"
+            % binascii.hexlify(buf[pos_start:pos])
         )
     return (value, pos)
 

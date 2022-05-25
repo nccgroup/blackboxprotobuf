@@ -39,6 +39,12 @@ settings.register_profile(
     database=database.ExampleDatabase(".hypothesis-db"),
     print_blob=True,
 )
+settings.register_profile(
+    "superextended",
+    max_examples=10000,
+    database=database.ExampleDatabase(".hypothesis-db"),
+    print_blob=True,
+)
 settings.load_profile("quick")
 
 

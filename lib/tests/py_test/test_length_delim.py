@@ -18,8 +18,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from hypothesis import given, assume, note, example
+from hypothesis import given, assume, note, example, reproduce_failure
 import hypothesis.strategies as st
+import collections
 import strategies
 import six
 import binascii
@@ -55,7 +56,7 @@ def test_bytes_guess_inverse(x):
     encoded = length_delim.encode_lendelim_message(
         wrapper_message, config, wrapper_typedef
     )
-    value, typedef, pos = length_delim.decode_lendelim_message(encoded, config, {})
+    value, typedef, _, pos = length_delim.decode_lendelim_message(encoded, config, {})
 
     # would like to fail if it guesses wrong, but sometimes it might parse as a message
     assume(typedef["1"]["type"] == "bytes")
@@ -91,7 +92,7 @@ def test_message_inverse(x):
     config = Config()
     typedef, message = x
     encoded = length_delim.encode_lendelim_message(message, config, typedef)
-    decoded, typedef_out, pos = length_delim.decode_lendelim_message(
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
         encoded, config, typedef, 0
     )
     note(encoded)
@@ -108,7 +109,7 @@ def test_anon_decode(x):
     config = Config()
     typedef, message = x
     encoded = length_delim.encode_lendelim_message(message, config, typedef)
-    decoded, typedef_out, pos = length_delim.decode_lendelim_message(
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
         encoded, config, {}, 0
     )
     note("Original message: %r" % message)
@@ -153,6 +154,7 @@ def test_anon_decode(x):
                             orig_values[i],
                             orig_field_typedef,
                             _,
+                            _,
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_bytes(orig_value),
                             config,
@@ -163,6 +165,7 @@ def test_anon_decode(x):
                         (
                             orig_values[i],
                             orig_field_typedef,
+                            _,
                             _,
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_string(orig_value),
@@ -218,7 +221,9 @@ def test_message_guess_inverse(x):
         wrapper_message, config, wrapper_typedef
     )
     note("Encoded length %d" % len(encoded))
-    value, decoded_type, pos = length_delim.decode_lendelim_message(encoded, config, {})
+    value, decoded_type, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, {}
+    )
 
     note(value)
     assert decoded_type["1"]["type"] == "message"
@@ -227,6 +232,56 @@ def test_message_guess_inverse(x):
     assert isinstance(value, dict)
     assert isinstance(value["1"], dict)
     assert pos == len(encoded)
+
+
+@given(bytes_in=st.binary())
+def test_message_guess_inverse(bytes_in):
+    # Test that a given byte array can be decoded anonymously then re-encoded to the same bytes
+
+    config = Config()
+
+    # embed it in a another message so we get proper type guessing
+    wrapper_typedef = {"1": {"type": "bytes"}}
+    wrapper_message = {"1": bytes_in}
+    bytes_in = length_delim.encode_message(wrapper_message, config, wrapper_typedef)
+
+    decoded_message, guessed_typedef, field_order, pos = length_delim.decode_message(
+        bytes_in, config, {}
+    )
+    assert pos == len(bytes_in)
+    bytes_out = length_delim.encode_message(decoded_message, config, guessed_typedef)
+    assert bytes_in == bytes_out
+
+
+@given(x=strategies.gen_message(), rng=st.randoms())
+def test_message_ordering(x, rng):
+    # messages need to preserve field ordering when encoding then decoding
+    # ordering technically shouldn't matter in a protobuf message, but if we
+    # decode a non-protobuf message as a protobuf and then re-encode it to
+    # bytes, it will scramble the bytes and violate the rule that decoding then
+    # re-encoding shouldn't change the message
+    config = Config()
+    typedef, message = x
+
+    # wrap the message in a new message so that it's a guess inside
+    typedef = {"1": {"type": "message", "message_typedef": typedef}}
+    message = {"1": message}
+
+    # encode to bytes first
+    message_bytes = length_delim.encode_message(message, config, typedef)
+
+    # now we have bytes that could be decoded as a message, we don't care what the original typedef is
+    decoded_message, typedef, _, _ = length_delim.decode_message(
+        message_bytes, config, {}
+    )
+
+    message_items = list(decoded_message["1"].items())
+    rng.shuffle(message_items)
+    decoded_message["1"] = collections.OrderedDict(message_items)
+
+    new_message_bytes = length_delim.encode_message(decoded_message, config, typedef)
+
+    assert message_bytes == new_message_bytes
 
 
 @given(x=strategies.input_map["packed_uint"])

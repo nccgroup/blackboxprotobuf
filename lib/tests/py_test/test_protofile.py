@@ -143,10 +143,10 @@ def test_proto_export_inverse(tmp_path, x, name):
             message, config, new_typedef_map[name]
         )
 
-        decode_forward, _, _ = length_delim.decode_message(
+        decode_forward, _, _, _ = length_delim.decode_message(
             encode_forward, config, new_typedef_map[name]
         )
-        decode_backward, _, _ = length_delim.decode_message(
+        decode_backward, _, _, _ = length_delim.decode_message(
             encode_backward, config, typedef_map[name]
         )
 

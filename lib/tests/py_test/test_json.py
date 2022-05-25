@@ -53,6 +53,11 @@ def test_message_json_inverse(x):
 
 @given(x=strategies.gen_message(anon=True))
 def test_anon_json_decode(x):
+    """Create a new encoded message, the try to decode without a typedef into a
+    json, from json back to binary and then  finally decode the message back to
+    the original format. Makes sure json decoding can handle any types and does
+    not change the essage.
+    """
     config = Config()
     typedef, message = x
     encoded = blackboxprotobuf.encode_message(
@@ -61,10 +66,13 @@ def test_anon_json_decode(x):
     decoded_json, typedef_out = blackboxprotobuf.protobuf_to_json(
         encoded, config=config
     )
+    note("To Json Typedef: %r" % dict(typedef_out))
     encoded_json = blackboxprotobuf.protobuf_from_json(
         decoded_json, config=config, message_type=typedef_out
     )
-    decoded, typedef_out = blackboxprotobuf.decode_message(encoded_json, config=config)
+    decoded, typedef_out = blackboxprotobuf.decode_message(
+        encoded_json, config=config, message_type=typedef
+    )
     note("Original message: %r" % message)
     note("Decoded JSON: %r" % decoded_json)
     note("Decoded message: %r" % decoded)
@@ -110,6 +118,7 @@ def test_anon_json_decode(x):
                             orig_values[i],
                             orig_field_typedef,
                             _,
+                            _,
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_bytes(orig_value),
                             config,
@@ -120,6 +129,7 @@ def test_anon_json_decode(x):
                         (
                             orig_values[i],
                             orig_field_typedef,
+                            _,
                             _,
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_string(orig_value),
@@ -152,3 +162,4 @@ def test_anon_json_decode(x):
                     assert orig_value == new_value
 
     check_message(message, typedef, decoded, typedef_out)
+    # assert message == decoded
