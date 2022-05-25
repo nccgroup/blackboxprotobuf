@@ -29,7 +29,14 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
         st.lists(st.integers(min_value=1, max_value=2000).map(str), min_size=1)
     )
     # pre-generate names so we can be sure they're unique
-    field_names = draw(st.lists(st.from_regex(blackboxprotobuf.NAME_REGEX), min_size=len(field_numbers), max_size=len(field_numbers), unique_by=lambda x: x.lower()))
+    field_names = draw(
+        st.lists(
+            st.from_regex(blackboxprotobuf.NAME_REGEX),
+            min_size=len(field_numbers),
+            max_size=len(field_numbers),
+            unique_by=lambda x: x.lower(),
+        )
+    )
     if types is None:
         message_types = [
             field_type
@@ -50,7 +57,12 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
             output[field_number]["seen_repeated"] = draw(st.booleans())
         if field_type == "message":
             output[field_number]["message_typedef"] = draw(
-                message_typedef_gen(max_depth=max_depth - 1, anon=anon, types=types, named_fields=named_fields)
+                message_typedef_gen(
+                    max_depth=max_depth - 1,
+                    anon=anon,
+                    types=types,
+                    named_fields=named_fields,
+                )
             )
         # decide whether to give it a name
         if named_fields and not anon and draw(st.booleans()):
@@ -93,7 +105,9 @@ def gen_message(draw, anon=False, named_fields=True):
         )
         # add length delim wiretypes
         allowed_types += ["message", "string", "bytes"]
-    type_def = draw(message_typedef_gen(anon=anon, types=allowed_types, named_fields=named_fields))
+    type_def = draw(
+        message_typedef_gen(anon=anon, types=allowed_types, named_fields=named_fields)
+    )
     message = draw(gen_message_data(type_def))
     return type_def, message
 
