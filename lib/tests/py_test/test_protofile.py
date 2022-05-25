@@ -131,10 +131,25 @@ def test_proto_export_inverse(tmp_path, x, name):
 def test_proto_import_examples():
     config = Config()
     # try importing all the examples pulled from protobuf repo
-    protofiles = glob.glob("tests/payloads/test_protos/*.proto")
+    protofiles = glob.glob("../burp/deps/protobuf/src/google/protobuf/*.proto")
     os.system("pwd")
+    # These files have some mechanism we don't support, mostly imports
+    unsupported_files = {
+        "../burp/deps/protobuf/src/google/protobuf/api.proto",  # import
+        "../burp/deps/protobuf/src/google/protobuf/unittest_optimize_for.proto",  # import
+        "../burp/deps/protobuf/src/google/protobuf/type.proto",  # import
+        "../burp/deps/protobuf/src/google/protobuf/unittest_lite_imports_nonlite.proto",  # import
+        "../burp/deps/protobuf/src/google/protobuf/unittest_lite.proto",  # group type not supported
+        "../burp/deps/protobuf/src/google/protobuf/unittest_embed_optimize_for.proto",  # import
+        "../burp/deps/protobuf/src/google/protobuf/unittest.proto",  # group
+        "../burp/deps/protobuf/src/google/protobuf/unittest_lazy_dependencies.proto",  # import
+    }
     assert len(protofiles) != 0
     for target_file in protofiles:
+        if target_file in unsupported_files:
+            print("Skipping file: %s" % target_file)
+            continue
+
         print("Testing file: %s" % target_file)
         typedef_map_out = protofile.import_proto(config, input_filename=target_file)
         config.known_types = typedef_map_out
