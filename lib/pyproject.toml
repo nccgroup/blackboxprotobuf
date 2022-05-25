@@ -7,7 +7,10 @@ license = "MIT"
 repository = "https://github.com/nccgroup/blackboxprotobuf"
 readme = "README.md"
 keywords = ["protobuf"]
-exclude = ["/tests"]
+exclude = ["./tests"]
+packages = [
+    { include = "blackboxprotobuf" }
+]
 
 [tool.poetry.dependencies]
 python = "^2.7 || ^3.3"
