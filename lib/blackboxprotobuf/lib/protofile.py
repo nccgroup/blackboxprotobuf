@@ -3,12 +3,10 @@ Python methods for importing and exporting '.proto' files from the BBP type
 definition format.
 """
 
-# TODO get custom exceptions for these methods
-
 import io
 import re
 import logging
-from blackboxprotobuf.lib.exceptions import TypedefException
+from blackboxprotobuf.lib.exceptions import TypedefException, ProtofileException
 import blackboxprotobuf.lib.api
 
 PROTO_FILE_TYPE_MAP = {
@@ -187,7 +185,9 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
     if input_file is None and input_filename is not None:
         input_file = io.open(input_filename, "r")
     if input_file is None:
-        raise ValueError("No file provided to import_proto")
+        raise ProtofileException(
+            "No file provided to import_proto", filename=input_filename
+        )
 
     syntax_version = "proto2"
     package_prefix = ""
@@ -253,7 +253,7 @@ def _parse_enum(line, input_file):
     while "}" not in line:
         line = input_file.readline()
         if not line:
-            raise ValueError("Did not find close of enum")
+            raise ProtofileException("Did not find close of enum")
     return enum_name
 
 
@@ -267,7 +267,7 @@ def _preparse_message(line, input_file):
     while "}" not in line:
         line = input_file.readline()
         if not line:
-            raise ValueError("Did not find close of message")
+            raise ProtofileException("Did not find close of message")
 
         line = line.strip()
         if line.startswith("enum") and ENUM_REGEX.match(line):
@@ -384,11 +384,11 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
 
     field_name = match.group(3)
     if not field_name:
-        raise ValueError("Could not parse field name from line: %s" % match)
+        raise ProtofileException("Could not parse field name from line: %s" % match)
     typedef["name"] = field_name
     field_number = match.group(4)
     if not field_number:
-        raise ValueError("Could not parse field number from line: %s" % match)
+        raise ProtofileException("Could not parse field number from line: %s" % match)
 
     # figure out repeated
     field_rule = match.group(1)
@@ -399,7 +399,7 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
 
     field_type = match.group(2)
     if not field_type:
-        raise ValueError("Could not parse field type from line: %s" % match)
+        raise ProtofileException("Could not parse field type from line: %s" % match)
     # check normal types
     bbp_type = PROTO_FILE_TYPE_TO_BBP.get(field_type, None)
     if not bbp_type:
@@ -419,7 +419,7 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
 
     if not bbp_type:
         # If we don't have a type now, then fail
-        raise ValueError(
+        raise ProtofileException(
             "Could not get a type for field %s: %s" % (field_name, field_type)
         )
 
@@ -434,7 +434,7 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
 
     # make sure the type lines up with packable
     if is_packed and bbp_type not in PACKABLE_TYPES:
-        raise ValueError(
+        raise ProtofileException(
             "Field %s set as packable, but not a packable type: %s"
             % (field_name, bbp_type)
         )
