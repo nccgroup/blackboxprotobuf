@@ -45,7 +45,7 @@ import blackboxprotobuf.lib.protofile
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 import blackboxprotobuf.lib.config
-from blackboxprotobuf.lib.exceptions import TypedefException
+from blackboxprotobuf.lib.exceptions import TypedefException, EncoderException
 
 
 def decode_message(buf, message_type=None, config=None):
@@ -359,15 +359,17 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
 
             # Recursively validate inner typedefs
             if key in ["message_typedef", "group_typedef"]:
-                if old_typedef is None:
-                    validate_typedef(value, _path=field_path, config=config)
-                else:
-                    validate_typedef(
-                        value, old_typedef[field_number][key], _path=field_path
-                    )
+                if isinstance(value, dict):
+                    if old_typedef is None:
+                        validate_typedef(value, _path=field_path, config=config)
+                    else:
+                        validate_typedef(
+                            value, old_typedef[field_number][key], _path=field_path
+                        )
             if key == "alt_typedefs":
                 for alt_field_number, alt_typedef in value.items():
-                    validate_typedef(alt_typedef, _path=field_path, config=config)
+                    if isinstance(alt_typedef, dict):
+                        validate_typedef(alt_typedef, _path=field_path, config=config)
 
     if old_typedef is not None:
         wiretype_map = {}
@@ -419,6 +421,13 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
         for number, item in typedef.items()
         if item.get("name", None)
     }
+    if not isinstance(values, dict):
+        # this function should only ever be called on a message, error out if
+        # it is not one. This usually means a type got swapped around
+        raise EncoderException(
+            "Error performing _json_safe_transform on message. Field was expected to be a message but was not: %r"
+            % values
+        )
     for name, value in values.items():
         alt_number = None
         base_name = name
@@ -429,6 +438,9 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
             field_number = name_map[base_name]
         else:
             field_number = base_name
+
+        if field_number not in typedef or "type" not in typedef[field_number]:
+            raise EncoderException("Field %r not found in typedef or does not have type attribute." % field_number)
 
         field_type = typedef[field_number]["type"]
         if field_type == "message":

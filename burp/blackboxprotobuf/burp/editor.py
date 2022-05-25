@@ -458,7 +458,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         # Check if something is selected
         if self._type_list_component.isSelectionEmpty():
             self._last_valid_type_index = None
-            del self._extension.saved_types[self._message_hash]
+            self._extension.saved_types.pop(self._message_hash, None)
             return
 
         # TODO won't actually work right if we delete the type we're using a
@@ -509,6 +509,8 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         # TODO this is kind of an ugly hack. Should redo how these are referenced
         # probably means rewriting a bunch of the editor
         old_source = self._source_typedef
+        if old_source is None:
+            old_source = {}
         old_source.clear()
         old_source.update(typedef)
         self.applyType(old_source)
@@ -631,8 +633,8 @@ class FilteredMessageModel(ListModel, ListDataListener):
         # recheck all the types with the new data
         for typename in self._types[:]:
             if not self._check_type(typename):
-                removed_index = self._types.index(type_name)
-                self._types.remove(type_name)
+                removed_index = self._types.index(typename)
+                self._types.remove(typename)
                 event = ListDataEvent(
                     self, ListDataEvent.INTERVAL_REMOVED, removed_index, removed_index
                 )
