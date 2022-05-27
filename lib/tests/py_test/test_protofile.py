@@ -156,7 +156,6 @@ def test_proto_import_examples():
     config = Config()
     # try importing all the examples pulled from protobuf repo
     protofiles = glob.glob("../burp/deps/protobuf/src/google/protobuf/*.proto")
-    os.system("pwd")
     # These files have some mechanism we don't support, mostly imports
     unsupported_files = {
         "../burp/deps/protobuf/src/google/protobuf/api.proto",  # import
