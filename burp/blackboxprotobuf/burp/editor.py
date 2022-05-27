@@ -242,6 +242,9 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             return gzip_decompress.decompress(payload)
 
         # Try to base64 decode
+        # TODO base64 lib is a little to flexible with parsing. Would be good
+        # to handle base64 + "web safe" base64, but need better validation and
+        # parsing
         #try:
         #    protobuf = base64.b64decode(payload, validate=True)
         #    self._encoder = "base64"
