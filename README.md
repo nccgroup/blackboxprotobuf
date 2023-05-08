@@ -1,5 +1,8 @@
 # Blackbox Protobuf
 
+**Blackbox Protobuf now has an official package on PyPi under the name `bbpb`.
+The `blackboxprotobuf` package is an older fork**
+
 ## Description
 
 Blackbox Protobuf is a set of tools for working with encoded Protocol Buffers
@@ -12,7 +15,7 @@ geneerate message handlers in their language of choice. The protobuf encoding
 is binary, and unlike json/xml not human readable or easy to modify by hand.
 The format also takes advantage of both sides having the message definition and
 strips out much of the type information. This is good for efficiency, but
-increases the difficulty analyizing or modifying the network traffic.
+increases the difficulty analyzing or modifying the network traffic.
 
 Blackbox protobuf is designed to allow working with protocol buffers without
 the message definition. It was originally implemented as a Burp extension for
@@ -24,7 +27,7 @@ for reverse engineering and forensics tooling.
 This repository contains two applications for working with protocol buffers:
 
 - A jython burp extension in [burp/](https://github.com/nccgroup/blackboxprotobuf/tree/master/burp)
-- A python library that can be used in other appliations in [lib/](https://github.com/nccgroup/blackboxprotobuf/tree/master/lib)
+- A python library that can be used in other applications in [lib/](https://github.com/nccgroup/blackboxprotobuf/tree/master/lib)
 
 ## Future Tools
 

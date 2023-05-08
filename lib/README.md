@@ -52,7 +52,12 @@ The package can be installed from source with:
 poetry install
 ```
 
-A package on pypi should be available in the near future.
+BlackBox Protobuf is also available on PyPi at <https://pypi.org/project/bbpb>.
+It can be installed with:
+
+```
+pip install bbpb
+```
 
 ## Interface
 The main `blackboxprotobuf` module defines an API with the core encode/decode
