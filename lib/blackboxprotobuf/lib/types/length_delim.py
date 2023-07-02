@@ -126,10 +126,10 @@ def encode_message(data, config, typedef, path=None, field_order=None):
                 # fields is that it's a default decoding which won't be a packed
                 try:
                     new_output = _encode_message_field(
-                        config, typedef, path, field_number, value, selected_index=index
+                        config, typedef, path, field_number, value,
+                        selected_index=index, skiplist=skiplist
                     )
                     output += new_output
-                    skiplist.add((field_number, index))
                 except EncoderException as exc:
                     logging.warn(
                         "Error encoding priority field: %s %s %r %r",
@@ -138,6 +138,8 @@ def encode_message(data, config, typedef, path=None, field_order=None):
                         path,
                         exc,
                     )
+                finally:
+                    skiplist.add((field_number, index))
 
     for field_number, value in data.items():
         new_output = _encode_message_field(
