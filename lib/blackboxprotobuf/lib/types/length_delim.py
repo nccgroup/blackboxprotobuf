@@ -116,46 +116,54 @@ def encode_message(data, config, typedef, path=None, field_order=None):
     if path is None:
         path = []
 
-    skiplist = set()
-    if field_order is not None:
-        for field_number, index in field_order:
-            if field_number in data:
-                value = data[field_number]
-                # This will probably fail in some weird cases, and will get a weird
-                # encoding for packed numbers but our main conern when ordering
-                # fields is that it's a default decoding which won't be a packed
-                try:
-                    new_output = _encode_message_field(
-                        config, typedef, path, field_number, value, selected_index=index
-                    )
-                    output += new_output
-                    skiplist.add((field_number, index))
-                except EncoderException as exc:
-                    logging.warn(
-                        "Error encoding priority field: %s %s %r %r",
-                        field_number,
-                        index,
-                        path,
-                        exc,
-                    )
-
-    for field_number, value in data.items():
-        new_output = _encode_message_field(
-            config, typedef, path, field_number, value, skiplist=skiplist
+    output_len = 0
+    field_outputs = {}
+    for field_id, value in data.items():
+        field_number, outputs = _encode_message_field(
+            config, typedef, path, field_id, value
         )
-        output += new_output
+
+        # In case the field number is represented in multiple locations in data
+        # (eg. as an int, as name, as a string with an int)
+        if field_number in field_outputs:
+            field_outputs[field_number].extend(outputs)
+        else:
+            field_outputs[field_number] = outputs
+        output_len += len(outputs)
+
+    output = bytearray()
+    if output_len > 0:
+        # TODO maybe add a config to ignore field order
+        if field_order is not None and len(field_order) == output_len:
+            # check for old typedefs which had field_order as a tuple
+            if isinstance(field_order[0], tuple):
+                field_order = [x[0] for x in field_order]
+            for field_number in field_order:
+                try:
+                    output += field_outputs[field_number].pop(0)
+                except (IndexError, KeyError):
+                    # If these don't match up despite us checking the overall
+                    # length, then we probably have something weird going on
+                    # with field naming.
+                    # This might mean ordering is off from the original, but
+                    # should break real protobuf messages
+                    logging.warning(
+                        "The field_order list does not match the fields from _encode_message_field"
+                    )
+                    # If we're hitting a mismatch between the field order and
+                    # what data we have, then just bail. We can encode the rest
+                    # normally
+                    break
+
+        # Group  together elements in an array
+        for values in field_outputs.values():
+            for value in values:
+                output += value
 
     return output
 
 
-def _encode_message_field(
-    config, typedef, path, field_number, value, selected_index=None, skiplist=None
-):
-    # Encodes a single field of a message to the byte array
-    # If selected_index is passed, it will only encode a single element if value is a list
-    # If skiplist is passed, it should be in the form of (field_number,index)
-    # and this will skip encoding those elements
-
+def _encode_message_field(config, typedef, path, field_id, value):
     # Get the field number convert it as necessary
     alt_field_number = None
 
@@ -164,22 +172,34 @@ def _encode_message_field(
     else:
         string_types = str
 
-    if isinstance(field_number, string_types):
-        if "-" in field_number:
-            field_number, alt_field_number = field_number.split("-")
-        for number, info in typedef.items():
-            if info.get("name", "") != ""  and info["name"] == field_number and field_number != "":
-                field_number = number
-                break
+    field_number = None
+    # Convert the field_id, which could be a number or a name, into a field number
+    # From a correctness standpoint, field_number should probably be an int
+    # type, but IIRC that leads to headaches elsewhere
+    if isinstance(field_id, string_types):
+        if "-" in field_id:
+            field_id, alt_field_number = field_id.split("-")
+        if field_id.isdigit():
+            field_number = field_id
+        else:
+            for number, info in typedef.items():
+                if (
+                    info.get("name", "") != ""
+                    and info["name"] == field_id
+                    and field_id != ""
+                ):
+                    field_number = number
+                    break
     else:
-        field_number = str(field_number)
+        field_number = str(field_id)
 
     field_path = path[:]
-    field_path.append(field_number)
+    field_path.append(field_id)
 
-    if field_number not in typedef:
+    if field_number is None or field_number not in typedef:
         raise EncoderException(
-            "Provided field name/number %s is not valid" % (field_number),
+            "Provided field name/number %s / $s is not valid"
+            % (field_id, field_number),
             field_path,
         )
 
@@ -249,33 +269,22 @@ def _encode_message_field(
         int(field_number), blackboxprotobuf.lib.types.WIRETYPES[field_type]
     )
 
-    output = bytearray()
+    outputs = []
     try:
-        # Handle repeated values
+        # Repeated values we'll encode each one separately and add them to the outputs list
+        # Packed values take in a list, but encode them into a single length
+        # delimited field, so we handle those as a non-repeated value
         if isinstance(value, list) and not field_type.startswith("packed_"):
-            if selected_index is not None:
-                if selected_index >= len(value):
-                    raise EncoderException(
-                        "Selected index is greater than the length of values: %r %r"
-                        % (selected_index, len(value)),
-                        path,
-                    )
-                output += tag
-                output += field_encoder(value[selected_index])
-            else:
-                for index, repeated in enumerate(value):
-                    if skiplist is None or (field_number, index) not in skiplist:
-                        output += tag
-                        output += field_encoder(repeated)
+            for repeated in value:
+                outputs.append(tag + field_encoder(repeated))
         else:
-            if skiplist is None or (field_number, 0) not in skiplist:
-                output += tag
-                output += field_encoder(value)
+            outputs.append(tag + field_encoder(value))
+
     except EncoderException as exc:
         exc.set_path(field_path)
         six.reraise(*sys.exc_info())
 
-    return output
+    return field_number, outputs
 
 
 def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=None):
@@ -424,7 +433,7 @@ def _group_by_number(buf, pos, end, path):
             output_map[field_number][1].append(field_buf)
         else:
             output_map[field_number] = (wire_type, [field_buf])
-        field_order.append((field_number, len(output_map[field_number][1]) - 1))
+        field_order.append(field_number)
         pos += length
     return output_map, field_order, pos
 
