@@ -134,7 +134,7 @@ def encode_message(data, config, typedef, path=None, field_order=None):
     output = bytearray()
     if output_len > 0:
         # TODO maybe add a config to ignore field order
-        if field_order is not None and len(field_order) == output_len:
+        if config.preserve_field_order and field_order is not None and len(field_order) == output_len:
             # check for old typedefs which had field_order as a tuple
             if isinstance(field_order[0], tuple):
                 field_order = [x[0] for x in field_order]
@@ -534,7 +534,10 @@ def _try_decode_lendelim_fields(
         # was able to decode everything as a message
         field_typedef["type"] = "message"
         field_typedef["message_typedef"] = all_typedefs["1"]
-        field_typedef["field_order"] = field_order
+
+        if config.preserve_field_order:
+            field_typedef["field_order"] = field_order
+
         if len(all_typedefs.keys()) > 1:
             del all_typedefs["1"]
             field_typedef.setdefault("alt_typedefs", {}).update(all_typedefs)

@@ -35,6 +35,13 @@ class Config:
         # Change the default type for a wiretype (eg.
         self.default_types = {}
 
+        # Configure whether bbpb should try to re-encode fields in the same
+        # order they decoded
+        # Field order shouldn't matter for real protobufs, but is there to ensure
+        # that bytes/string are accidentally valid protobufs don't get scrambled
+        # by decoding/re-encoding
+        self.preserve_field_order = True
+
     def get_default_type(self, wiretype):
         default_type = self.default_types.get(wiretype, None)
         if default_type is None:
