@@ -360,12 +360,12 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
             # Recursively validate inner typedefs
             if key in ["message_typedef", "group_typedef"]:
                 if isinstance(value, dict):
-                    if old_typedef is None:
-                        validate_typedef(value, _path=field_path, config=config)
-                    else:
+                    if old_typedef is not None and field_number in old_typedef and key in old_typedef[field_number]:
                         validate_typedef(
-                            value, old_typedef[field_number][key], _path=field_path
+                            value, old_typedef=old_typedef[field_number][key], _path=field_path, config=config
                         )
+                    else:
+                        validate_typedef(value, _path=field_path, config=config)
             if key == "alt_typedefs":
                 for alt_field_number, alt_typedef in value.items():
                     if isinstance(alt_typedef, dict):
