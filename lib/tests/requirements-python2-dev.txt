@@ -1,0 +1,5 @@
+protobuf==3.17.3
+six==1.16
+pytest==4.6.11
+more_itertools>=5.0
+hypothesis==4.57.1
