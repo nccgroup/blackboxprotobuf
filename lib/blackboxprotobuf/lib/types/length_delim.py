@@ -133,7 +133,6 @@ def encode_message(data, config, typedef, path=None, field_order=None):
 
     output = bytearray()
     if output_len > 0:
-        # TODO maybe add a config to ignore field order
         if config.preserve_field_order and field_order is not None and len(field_order) == output_len:
             # check for old typedefs which had field_order as a tuple
             if isinstance(field_order[0], tuple):

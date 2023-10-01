@@ -32,7 +32,8 @@ class Config:
         # Other option is currently just 'bytes_hex'
         self.default_binary_type = "bytes"
 
-        # Change the default type for a wiretype (eg.
+        # Change the default type for a wiretype (eg. change ints to be signed
+        # by default or fixed fields to always be float)
         self.default_types = {}
 
         # Configure whether bbpb should try to re-encode fields in the same
