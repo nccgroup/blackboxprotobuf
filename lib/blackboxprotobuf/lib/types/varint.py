@@ -28,6 +28,12 @@ import six
 
 from blackboxprotobuf.lib.exceptions import EncoderException, DecoderException
 
+# These are set in decoder.py
+# In theory, uvarints and zigzag varints shouldn't have a max
+# But this is enforced by protobuf
+MAX_UVARINT = (1 << 64) - 1
+MAX_SVARINT = (1 << 63) - 1
+
 
 def _gen_append_bytearray(arr):
     def _append_bytearray(x):
@@ -47,6 +53,11 @@ def encode_uvarint(value):
     if value < 0:
         raise EncoderException(
             "Error encoding %d as uvarint. Value must be positive" % value
+        )
+    if value > MAX_UVARINT:
+        raise EncoderException(
+            "Error encoding %d as uvarint. Value must be %s or less"
+            % (value, MAX_UVARINT)
         )
     try:
         encoder._EncodeVarint(_gen_append_bytearray(output), value)
@@ -72,26 +83,25 @@ def decode_uvarint(buf, pos):
             ),
             exc,
         )
-    if six.indexbytes(buf, pos - 1) == 0x00 and (pos - pos_start) > 1:
+    # Validate that this is a cononical encoding by re-encoding the value
+    test_encode = encode_uvarint(value)
+    if buf[pos_start:pos] != test_encode:
         raise DecoderException(
-            "Non standard varint encoding: %r" % binascii.hexlify(buf[pos_start:pos])
+            "Error decoding uvarint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
+            % (buf[pos_start:pos], test_encode)
         )
-    if (pos - pos_start) >= 10 and six.indexbytes(buf, pos - 1) != 0x01:
-        # math here might be wrong, but it seems like the max value in uint
-        # after it's been masked will have 0x01 as the last byte anything
-        # greater (or less) is a non-standard encoding
-        raise DecoderException(
-            "Non standard signed varint encoding: %r"
-            % binascii.hexlify(buf[pos_start:pos])
-        )
+
     return (value, pos)
 
 
 def encode_varint(value):
     """Encode a long or int into a bytearray."""
     output = bytearray()
-    if value > (2 ** 63) or value < -(2 ** 63):
-        raise EncoderException("Value %d above maximum varint size" % value)
+    if abs(value) > MAX_SVARINT:
+        raise EncoderException(
+            "Error encoding %d as uarint. Value must be %s or less (abs)"
+            % (value, MAX_SVARINT)
+        )
     try:
         encoder._EncodeSignedVarint(_gen_append_bytearray(output), value)
     except (struct.error, ValueError) as exc:
@@ -117,23 +127,12 @@ def decode_varint(buf, pos):
             ),
             exc,
         )
-    # Throw an error for a non-canonical representation. It would be nice to be
-    # as flexible as possible when possible, but we also want to make sure
-    # encode(decode(x)) == x for any x so that mis-parsing bytes as a message
-    # doesn't change the bytes. Maybe have a way to turn off these checks via a
-    # flag? We shouldn't really ever get a non-canonical representation from a
-    # real protobuf representation
-    if six.indexbytes(buf, pos - 1) == 0x00 and (pos - pos_start) > 1:
+    # Validate that this is a cononical encoding by re-encoding the value
+    test_encode = encode_varint(value)
+    if buf[pos_start:pos] != test_encode:
         raise DecoderException(
-            "Non standard varint encoding: %r" % binascii.hexlify(buf[pos_start:pos])
-        )
-    if value < 0 and six.indexbytes(buf, pos - 1) != 0x01:
-        # math here might be wrong, but it seems like the max value in uint
-        # after it's been masked will have 0x01 as the last byte anything
-        # greater (or less) is a non-standard encoding
-        raise DecoderException(
-            "Non standard signed varint encoding: %r"
-            % binascii.hexlify(buf[pos_start:pos])
+            "Error decoding varint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
+            % (buf[pos_start:pos], test_encode)
         )
     return (value, pos)
 
@@ -141,11 +140,28 @@ def decode_varint(buf, pos):
 def encode_svarint(value):
     """Zigzag encode the potentially signed value prior to encoding"""
     # zigzag encode value
+    if abs(value) > MAX_SVARINT:
+        raise EncoderException(
+            "Error encoding %d as svarint. Value must be %s or less (abs)"
+            % (value, MAX_SVARINT)
+        )
     return encode_uvarint(wire_format.ZigZagEncode(value))
 
 
 def decode_svarint(buf, pos):
     """Decode bytearray into a long."""
+    pos_start = pos
+
     output, pos = decode_uvarint(buf, pos)
     # zigzag encode value
-    return wire_format.ZigZagDecode(output), pos
+    value = wire_format.ZigZagDecode(output)
+
+    # Validate that this is a cononical encoding by re-encoding the value
+    test_encode = encode_svarint(value)
+    if buf[pos_start:pos] != test_encode:
+        raise DecoderException(
+            "Error decoding svarint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
+            % (buf[pos_start:pos], test_encode)
+        )
+
+    return value, pos

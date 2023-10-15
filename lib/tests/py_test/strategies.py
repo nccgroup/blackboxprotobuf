@@ -21,6 +21,7 @@
 import binascii
 import hypothesis.strategies as st
 import blackboxprotobuf
+from blackboxprotobuf.lib.types import varint
 from blackboxprotobuf.lib.types import type_maps
 
 from hypothesis import settings
@@ -140,15 +141,18 @@ def gen_message(draw, anon=False, named_fields=True):
 
 # Map types to generators
 input_map = {
-    "fixed32": st.integers(min_value=0, max_value=(2 ** 32) - 1),
-    "sfixed32": st.integers(min_value=-(2 ** 16), max_value=2 ** 16),
-    "fixed64": st.integers(min_value=0, max_value=(2 ** 64) - 1),
-    "sfixed64": st.integers(min_value=-(2 ** 32), max_value=2 ** 32),
+    "fixed32": st.integers(min_value=0, max_value=(2**32) - 1),
+    "sfixed32": st.integers(min_value=-(2**16), max_value=2**16),
+    "fixed64": st.integers(min_value=0, max_value=(2**64) - 1),
+    "sfixed64": st.integers(min_value=-(2**32), max_value=2**32),
     "float": st.floats(width=32, allow_nan=False),
     "double": st.floats(width=64, allow_nan=False),
-    "uint": st.integers(min_value=0, max_value=2 ** 63),
-    "int": st.integers(min_value=-(2 ** 63), max_value=2 ** 63),
-    "sint": st.integers(min_value=-(2 ** 63), max_value=2 ** 63),
+    # Varints are 10 bytes max
+    # Each varint byte has 7 bits
+    # so we have 70 bits total
+    "uint": st.integers(min_value=0, max_value=varint.MAX_UVARINT),
+    "int": st.integers(min_value=-(varint.MAX_SVARINT), max_value=varint.MAX_SVARINT),
+    "sint": st.integers(min_value=-(varint.MAX_SVARINT), max_value=varint.MAX_SVARINT),
     "bytes": st.binary(),
     "string": st.text(),
     #'bytes_hex':  st.binary().map(binascii.hexlify),
