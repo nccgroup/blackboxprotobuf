@@ -17,7 +17,7 @@ be referenced within other typedefs. This argument can be left out to use a
 default shared config object.
 """
 
-# Copyright (c) 2018-2022 NCC Group Plc
+# Copyright (c) 2018-2023 NCC Group Plc
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal

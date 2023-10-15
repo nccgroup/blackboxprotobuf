@@ -1,6 +1,6 @@
 """Tests similar to the length_delim or protobuf tests, but make sure we can round trip through the JSON encode/decode """
 
-# Copyright (c) 2018-2022 NCC Group Plc
+# Copyright (c) 2018-2023 NCC Group Plc
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal

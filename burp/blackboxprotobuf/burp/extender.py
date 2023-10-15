@@ -2,7 +2,7 @@
 editor factory for individual tabs
 """
 
-# Copyright (c) 2018-2022 NCC Group Plc
+# Copyright (c) 2018-2023 NCC Group Plc
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
