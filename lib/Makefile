@@ -9,3 +9,5 @@ test_py2: setup_py2
 test_py3:
 	poetry env use python3
 	poetry run python -m pytest tests/
+format:
+	poetry run black .
