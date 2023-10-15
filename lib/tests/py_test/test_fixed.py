@@ -35,12 +35,36 @@ def test_fixed32_inverse(x):
     assert decoded == x
 
 
+@given(x=st.binary(min_size=4))
+def test_fixed32_idem(x):
+    try:
+        value, pos = fixed.decode_fixed32(x, 0)
+    except DecoderException:
+        assume(True)
+        return
+
+    encoded = fixed.encode_fixed32(value)
+    assert encoded == x[:pos]
+
+
 @given(x=strategies.input_map["sfixed32"])
 def test_sfixed32_inverse(x):
     encoded = fixed.encode_sfixed32(x)
     decoded, pos = fixed.decode_sfixed32(encoded, 0)
     assert pos == len(encoded)
     assert decoded == x
+
+
+@given(x=st.binary(min_size=4))
+def test_sfixed32_idem(x):
+    try:
+        value, pos = fixed.decode_sfixed32(x, 0)
+    except DecoderException:
+        assume(True)
+        return
+
+    encoded = fixed.encode_sfixed32(value)
+    assert encoded == x[:pos]
 
 
 @given(x=strategies.input_map["fixed64"])
@@ -51,12 +75,36 @@ def test_fixed64_inverse(x):
     assert decoded == x
 
 
+@given(x=st.binary(min_size=8))
+def test_fixed64_idem(x):
+    try:
+        value, pos = fixed.decode_fixed64(x, 0)
+    except DecoderException:
+        assume(True)
+        return
+
+    encoded = fixed.encode_fixed64(value)
+    assert encoded == x[:pos]
+
+
 @given(x=strategies.input_map["sfixed64"])
 def test_sfixed64_inverse(x):
     encoded = fixed.encode_sfixed64(x)
     decoded, pos = fixed.decode_sfixed64(encoded, 0)
     assert pos == len(encoded)
     assert decoded == x
+
+
+@given(x=st.binary(min_size=8))
+def test_sfixed64_idem(x):
+    try:
+        value, pos = fixed.decode_sfixed64(x, 0)
+    except DecoderException:
+        assume(True)
+        return
+
+    encoded = fixed.encode_sfixed64(value)
+    assert encoded == x[:pos]
 
 
 @given(x=strategies.input_map["float"])
@@ -70,6 +118,20 @@ def test_float_inverse(x):
         assert decoded == x
 
 
+# Would be nice, but not a default type, so probably ok
+# Probably asking for trouble to have a float decode then encode the same
+# @given(x=st.binary(min_size=4))
+# def test_float_idem(x):
+#    try:
+#        value, pos = fixed.decode_float(x, 0)
+#    except DecoderException:
+#        assume(True)
+#        return
+#
+#    encoded = fixed.encode_float(value)
+#    assert encoded == x[:pos]
+
+
 @given(x=strategies.input_map["double"])
 def test_double_inverse(x):
     encoded = fixed.encode_double(x)
@@ -79,3 +141,15 @@ def test_double_inverse(x):
         assert math.isnan(decoded)
     else:
         assert decoded == x
+
+
+# @given(x=st.binary(min_size=8))
+# def test_double_idem(x):
+#    try:
+#        value, pos = fixed.decode_double(x, 0)
+#    except DecoderException:
+#        assume(True)
+#        return
+#
+#    encoded = fixed.encode_double(value)
+#    assert encoded == x[:pos]
