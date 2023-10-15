@@ -360,9 +360,16 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
             # Recursively validate inner typedefs
             if key in ["message_typedef", "group_typedef"]:
                 if isinstance(value, dict):
-                    if old_typedef is not None and field_number in old_typedef and key in old_typedef[field_number]:
+                    if (
+                        old_typedef is not None
+                        and field_number in old_typedef
+                        and key in old_typedef[field_number]
+                    ):
                         validate_typedef(
-                            value, old_typedef=old_typedef[field_number][key], _path=field_path, config=config
+                            value,
+                            old_typedef=old_typedef[field_number][key],
+                            _path=field_path,
+                            config=config,
                         )
                     else:
                         validate_typedef(value, _path=field_path, config=config)
@@ -440,7 +447,10 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
             field_number = base_name
 
         if field_number not in typedef or "type" not in typedef[field_number]:
-            raise EncoderException("Field %r not found in typedef or does not have type attribute." % field_number)
+            raise EncoderException(
+                "Field %r not found in typedef or does not have type attribute."
+                % field_number
+            )
 
         field_type = typedef[field_number]["type"]
         if field_type == "message":
@@ -597,7 +607,6 @@ def sort_typedef(typedef):
                 output_field_def[key] = field_def[key]
                 del field_def[key]
         for key, value in field_def.items():
-
             if key == "message_typedef":
                 output_field_def[key] = sort_typedef(value)
             else:
@@ -630,8 +639,9 @@ def _annotate_typedef(typedef, message):
 
         # Add a blank name field if the field doesn't have one, so it's easier
         # to add
-        if 'name' not in field_def:
-            field_def['name'] = ""
+        if "name" not in field_def:
+            field_def["name"] = ""
+
 
 def _strip_typedef_annotations(typedef):
     # Remove example values placed by _annotate_typedef

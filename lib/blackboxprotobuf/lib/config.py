@@ -23,7 +23,6 @@ from .types import type_maps
 
 class Config:
     def __init__(self):
-
         # Map of message type names to typedefs, previously stored at
         # `blackboxprotobuf.known_messages`
         self.known_types = {}

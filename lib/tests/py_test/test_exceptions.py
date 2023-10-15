@@ -34,6 +34,7 @@ from blackboxprotobuf.lib.exceptions import (
 
 # Fixed exception tests
 
+
 ## Encoding
 @given(value=st.integers())
 def test_encode_fixed32(value):

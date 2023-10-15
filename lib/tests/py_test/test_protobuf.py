@@ -69,6 +69,7 @@ testMessage_typedef = {
     # "65536": {"type": "packed_int", "name": "testRepeatedInt32"}
 }
 
+
 # Test decoding from blackboxprotobuf
 @given(x=strategies.gen_message_data(testMessage_typedef))
 def test_decode(x):

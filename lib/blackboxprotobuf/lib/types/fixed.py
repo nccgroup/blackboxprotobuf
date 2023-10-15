@@ -25,6 +25,7 @@ import binascii
 import six
 from blackboxprotobuf.lib.exceptions import DecoderException, EncoderException
 
+
 # Generic functions for encoding/decoding structs based on the "struct" format
 def encode_struct(fmt, value):
     """Generic method for encoding arbitrary python "struct" values"""

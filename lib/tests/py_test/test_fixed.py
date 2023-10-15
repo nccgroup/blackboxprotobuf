@@ -25,6 +25,7 @@ import strategies
 
 from blackboxprotobuf.lib.types import fixed
 
+
 # Inverse checks. Ensure a value encoded by bbp decodes to the same value
 @given(x=strategies.input_map["fixed32"])
 def test_fixed32_inverse(x):

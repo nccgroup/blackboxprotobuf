@@ -56,7 +56,6 @@ def test_proto_export(tmp_path, typedef, name):
     with tempfile.NamedTemporaryFile(
         mode="w", dir=str(tmp_path), suffix=".proto", delete=True
     ) as outfile:
-
         typedef_map = {name: typedef}
 
         note(typedef_map)
@@ -88,7 +87,6 @@ def test_proto_export_inverse(tmp_path, x, name):
     with tempfile.NamedTemporaryFile(
         mode="r+", dir=str(tmp_path), suffix=".proto", delete=True
     ) as outfile:
-
         typedef_map = {name: typedef}
 
         protofile.export_proto(typedef_map, output_file=outfile)

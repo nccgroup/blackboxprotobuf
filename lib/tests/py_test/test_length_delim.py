@@ -34,6 +34,7 @@ if six.PY2:
 else:
     string_types = str
 
+
 # Inverse checks. Ensure a value encoded by bbp decodes to the same value
 @given(x=strategies.input_map["bytes"])
 def test_bytes_inverse(x):
@@ -200,14 +201,14 @@ def test_anon_decode(x):
 
 
 @given(x=strategies.gen_message())
-@example(x=({"1": {"seen_repeated": True, "type": "string"}}, {"1": [u"", u"0"]}))
+@example(x=({"1": {"seen_repeated": True, "type": "string"}}, {"1": ["", "0"]}))
 @example(
     x=(
         {
             "1": {"seen_repeated": False, "type": "sfixed32"},
             "2": {"seen_repeated": True, "type": "string"},
         },
-        {"1": 0, "2": [u"0", u"00"]},
+        {"1": 0, "2": ["0", "00"]},
     )
 )
 def test_message_guess_inverse(x):

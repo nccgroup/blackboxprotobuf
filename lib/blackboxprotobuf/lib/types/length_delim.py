@@ -133,7 +133,11 @@ def encode_message(data, config, typedef, path=None, field_order=None):
 
     output = bytearray()
     if output_len > 0:
-        if config.preserve_field_order and field_order is not None and len(field_order) == output_len:
+        if (
+            config.preserve_field_order
+            and field_order is not None
+            and len(field_order) == output_len
+        ):
             # check for old typedefs which had field_order as a tuple
             if isinstance(field_order[0], tuple):
                 field_order = [x[0] for x in field_order]
@@ -303,7 +307,7 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
     output = {}
 
     grouped_fields, field_order, pos = _group_by_number(buf, pos, end, path)
-    for (field_number, (wire_type, buffers)) in grouped_fields.items():
+    for field_number, (wire_type, buffers) in grouped_fields.items():
         # wire_type should already be validated by _group_by_number
 
         path = path[:] + [field_number]
@@ -311,16 +315,11 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
         field_typedef = typedef.get(field_number, {})
         field_key = _get_field_key(field_number, typedef, path)
         # Easy cases. Fixed size or bytes/string
-        if (
-            wire_type
-            in [
-                wire_format.WIRETYPE_FIXED32,
-                wire_format.WIRETYPE_FIXED64,
-                wire_format.WIRETYPE_VARINT,
-            ]
-            or ("type" in field_typedef and field_typedef["type"] != "message")
-        ):
-
+        if wire_type in [
+            wire_format.WIRETYPE_FIXED32,
+            wire_format.WIRETYPE_FIXED64,
+            wire_format.WIRETYPE_VARINT,
+        ] or ("type" in field_typedef and field_typedef["type"] != "message"):
             if "type" not in field_typedef:
                 field_typedef["type"] = config.get_default_type(wire_type)
             else:
