@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bbpb"
-version = "1.0.0"
+version = "1.0.1"
 description = "Library for working with protobuf messages without a protobuf type definition."
 authors = ["Ryan Winkelmaier <ryan.winkelmaier@nccgroup.com>"]
 license = "MIT"
