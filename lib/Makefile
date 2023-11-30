@@ -5,9 +5,9 @@ setup_py2:
 	. /tmp/bbpb-python2-tmp/bin/activate
 	python2 -m pip install -r tests/requirements-python2-dev.txt
 test_py2: setup_py2
-	python2 -m pytest tests/
+	python2 -m pytest tests/py_test/
 test_py3:
 	poetry env use python3
-	poetry run python -m pytest tests/
+	poetry run python -m pytest tests/py_test/
 format:
-	poetry run black .
+	poetry run black --exclude deps/ .

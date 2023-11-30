@@ -22,6 +22,9 @@ from hypothesis import given, example, note, assume
 import hypothesis.strategies as st
 import strategies
 import pytest
+import six
+
+from google.protobuf.internal import wire_format, encoder, decoder
 
 from blackboxprotobuf.lib.types import varint
 from blackboxprotobuf.lib.exceptions import EncoderException, DecoderException
@@ -130,3 +133,81 @@ def test_bounds_varints(x):
 
     with pytest.raises(EncoderException):
         varint.encode_svarint(-x)
+
+
+def _gen_append_bytearray(arr):
+    def _append_bytearray(x):
+        if isinstance(x, (str, int)):
+            arr.append(x)
+        elif isinstance(x, bytes):
+            arr.extend(x)
+        else:
+            raise EncoderException("Unknown type returned by protobuf library")
+
+    return _append_bytearray
+
+
+# Test our varint functions against google
+@given(x=strategies.input_map["uint"])
+def test_uvarint_encode(x):
+    encoded_google = bytearray()
+    encoder._EncodeVarint(_gen_append_bytearray(encoded_google), x)
+    encoded_bbpb = varint.encode_uvarint(x)
+    assert encoded_google == encoded_bbpb
+
+
+@given(x=strategies.input_map["uint"])
+def test_uvarint_decode(x):
+    buf = bytearray()
+    encoder._EncodeVarint(_gen_append_bytearray(buf), x)
+
+    if six.PY2:
+        buf = str(buf)
+    decoded_google, _ = decoder._DecodeVarint(buf, 0)
+    decoded_bbpb, _ = varint.decode_uvarint(buf, 0)
+    assert decoded_google == decoded_bbpb
+
+
+@given(x=strategies.input_map["int"])
+def test_varint_encode(x):
+    encoded_google = bytearray()
+    encoder._EncodeSignedVarint(_gen_append_bytearray(encoded_google), x)
+    encoded_bbpb = varint.encode_varint(x)
+    assert encoded_google == encoded_bbpb
+
+
+@given(x=strategies.input_map["int"])
+def test_varint_decode(x):
+    buf = bytearray()
+    encoder._EncodeSignedVarint(_gen_append_bytearray(buf), x)
+
+    if six.PY2:
+        buf = bytes(buf)
+    decoded_google, _ = decoder._DecodeSignedVarint(buf, 0)
+    decoded_bbpb, _ = varint.decode_varint(buf, 0)
+    assert decoded_google == decoded_bbpb
+
+
+@given(x=strategies.input_map["sint"])
+def test_svarint_encode(x):
+    encoded_google = bytearray()
+    encoder._EncodeSignedVarint(
+        _gen_append_bytearray(encoded_google), wire_format.ZigZagEncode(x)
+    )
+    encoded_bbpb = varint.encode_svarint(x)
+    assert encoded_google == encoded_bbpb
+
+
+@given(x=strategies.input_map["sint"])
+@example(x=-1)
+def test_svarint_decode(x):
+    buf = bytearray()
+    encoder._EncodeSignedVarint(_gen_append_bytearray(buf), wire_format.ZigZagEncode(x))
+
+    if six.PY2:
+        buf = bytes(buf)
+    decoded_google_uint, _ = decoder._DecodeVarint(buf, 0)
+    decoded_google = wire_format.ZigZagDecode(decoded_google_uint)
+    decoded_bbpb, _ = varint.decode_svarint(buf, 0)
+
+    assert decoded_google == decoded_bbpb

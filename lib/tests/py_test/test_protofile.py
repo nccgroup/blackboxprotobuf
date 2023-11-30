@@ -153,17 +153,17 @@ def test_proto_export_inverse(tmp_path, x, name):
 def test_proto_import_examples():
     config = Config()
     # try importing all the examples pulled from protobuf repo
-    protofiles = glob.glob("../burp/deps/protobuf/src/google/protobuf/*.proto")
+    protofiles = glob.glob("tests/deps/protobuf/src/google/protobuf/*.proto")
     # These files have some mechanism we don't support, mostly imports
     unsupported_files = {
-        "../burp/deps/protobuf/src/google/protobuf/api.proto",  # import
-        "../burp/deps/protobuf/src/google/protobuf/unittest_optimize_for.proto",  # import
-        "../burp/deps/protobuf/src/google/protobuf/type.proto",  # import
-        "../burp/deps/protobuf/src/google/protobuf/unittest_lite_imports_nonlite.proto",  # import
-        "../burp/deps/protobuf/src/google/protobuf/unittest_lite.proto",  # group type not supported
-        "../burp/deps/protobuf/src/google/protobuf/unittest_embed_optimize_for.proto",  # import
-        "../burp/deps/protobuf/src/google/protobuf/unittest.proto",  # group
-        "../burp/deps/protobuf/src/google/protobuf/unittest_lazy_dependencies.proto",  # import
+        "tests/deps/protobuf/src/google/protobuf/api.proto",  # import
+        "tests/deps/protobuf/src/google/protobuf/unittest_optimize_for.proto",  # import
+        "tests/deps/protobuf/src/google/protobuf/type.proto",  # import
+        "tests/deps/protobuf/src/google/protobuf/unittest_lite_imports_nonlite.proto",  # import
+        "tests/deps/protobuf/src/google/protobuf/unittest_lite.proto",  # group type not supported
+        "tests/deps/protobuf/src/google/protobuf/unittest_embed_optimize_for.proto",  # import
+        "tests/deps/protobuf/src/google/protobuf/unittest.proto",  # group
+        "tests/deps/protobuf/src/google/protobuf/unittest_lazy_dependencies.proto",  # import
     }
     assert len(protofiles) != 0
     for target_file in protofiles:
