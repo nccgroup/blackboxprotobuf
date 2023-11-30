@@ -417,7 +417,7 @@ def _group_by_number(buf, pos, end, path):
         ]:
             raise DecoderException("GROUP wire types not supported", path=path)
         else:
-            raise DecoderException("Got unkown wire type: %d" % wire_type, path=path)
+            raise DecoderException("Got unknown wire type: %d" % wire_type, path=path)
         if pos + length > end:
             raise DecoderException(
                 "Decoded length for field %s goes over end: %d > %d"
