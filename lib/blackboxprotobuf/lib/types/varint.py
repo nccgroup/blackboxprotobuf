@@ -30,13 +30,15 @@ from blackboxprotobuf.lib.exceptions import EncoderException, DecoderException
 # In theory, uvarints and zigzag varints shouldn't have a max
 # But this is enforced by protobuf
 MAX_UVARINT = (1 << 64) - 1
+MIN_UVARINT = 0
 MAX_SVARINT = (1 << 63) - 1
+MIN_SVARINT = -(1 << 63)
 
 
 def encode_uvarint(value):
     """Encode a long or int into a bytearray."""
     output = bytearray()
-    if value < 0:
+    if value < MIN_UVARINT:
         raise EncoderException(
             "Error encoding %d as uvarint. Value must be positive" % value
         )
@@ -85,7 +87,7 @@ def decode_uvarint(buf, pos):
         test_encode = encode_uvarint(value)
     except EncoderException as ex:
         raise DecoderException(
-            "Error decoding varint: value (%s) was not able to be re-encoded: %s"
+            "Error decoding uvarint: value (%s) was not able to be re-encoded: %s"
             % (value, ex)
         )
     if buf[pos_start:pos] != test_encode:
@@ -99,10 +101,13 @@ def decode_uvarint(buf, pos):
 
 def encode_varint(value):
     """Encode a long or int into a bytearray."""
-    if abs(value) > MAX_SVARINT:
+    if value > MAX_SVARINT:
         raise EncoderException(
-            "Error encoding %d as varint. Value must be %s or less (abs)"
-            % (value, MAX_SVARINT)
+            "Error encoding %d as varint. Value must be <= %s" % (value, MAX_SVARINT)
+        )
+    if value < MIN_SVARINT:
+        raise EncoderException(
+            "Error encoding %d as varint. Value must be >= %s" % (value, MIN_SVARINT)
         )
     if value < 0:
         value += 1 << 64
@@ -154,10 +159,13 @@ def decode_zig_zag(value):
 def encode_svarint(value):
     """Zigzag encode the potentially signed value prior to encoding"""
     # zigzag encode value
-    if abs(value) > MAX_SVARINT:
+    if value > MAX_SVARINT:
         raise EncoderException(
-            "Error encoding %d as svarint. Value must be %s or less (abs)"
-            % (value, MAX_SVARINT)
+            "Error encoding %d as svarint. Value must be <= %s" % (value, MAX_SVARINT)
+        )
+    if value < MIN_SVARINT:
+        raise EncoderException(
+            "Error encoding %d as svarint. Value must be >= %s" % (value, MIN_SVARINT)
         )
     return encode_uvarint(encode_zig_zag(value))
 

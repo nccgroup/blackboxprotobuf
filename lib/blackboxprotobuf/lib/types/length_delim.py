@@ -410,7 +410,7 @@ def _group_by_number(buf, pos, end, path):
         length = None
         if wire_type == wiretypes.VARINT:
             # We actually have to read in the whole varint to figure out it's size
-            _, new_pos = varint.decode_varint(buf, pos)
+            _, new_pos = varint.decode_uvarint(buf, pos)
             length = new_pos - pos
         elif wire_type == wiretypes.FIXED32:
             length = 4

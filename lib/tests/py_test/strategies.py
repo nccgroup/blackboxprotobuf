@@ -142,17 +142,14 @@ def gen_message(draw, anon=False, named_fields=True):
 # Map types to generators
 input_map = {
     "fixed32": st.integers(min_value=0, max_value=(2**32) - 1),
-    "sfixed32": st.integers(min_value=-(2**16), max_value=2**16),
+    "sfixed32": st.integers(min_value=-(2**31), max_value=(2**31) - 1),
     "fixed64": st.integers(min_value=0, max_value=(2**64) - 1),
-    "sfixed64": st.integers(min_value=-(2**32), max_value=2**32),
+    "sfixed64": st.integers(min_value=-(2**63), max_value=(2**63) - 1),
     "float": st.floats(width=32, allow_nan=False),
     "double": st.floats(width=64, allow_nan=False),
-    # Varints are 10 bytes max
-    # Each varint byte has 7 bits
-    # so we have 70 bits total
-    "uint": st.integers(min_value=0, max_value=varint.MAX_UVARINT),
-    "int": st.integers(min_value=-(varint.MAX_SVARINT), max_value=varint.MAX_SVARINT),
-    "sint": st.integers(min_value=-(varint.MAX_SVARINT), max_value=varint.MAX_SVARINT),
+    "uint": st.integers(min_value=varint.MIN_UVARINT, max_value=varint.MAX_UVARINT),
+    "int": st.integers(min_value=varint.MIN_SVARINT, max_value=varint.MAX_SVARINT),
+    "sint": st.integers(min_value=varint.MIN_SVARINT, max_value=varint.MAX_SVARINT),
     "bytes": st.binary(),
     "string": st.text(),
     #'bytes_hex':  st.binary().map(binascii.hexlify),
