@@ -187,7 +187,7 @@ At the moment this includes:
 
 * `default_types` - Change the default type choice for any wiretype when
   decoding a previously unknown field. For example, to default to unsigned
-  integers for all varints, set `default_types[wire_format.WIRETYPE_VARINT] =
+  integers for all varints, set `default_types[WIRETYPE_VARINT] =
   'uint'`.
 
 The `api` functions like `blackboxprotobuf.decode_message` will default to

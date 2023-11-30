@@ -26,10 +26,8 @@ import sys
 import six
 import logging
 
-from google.protobuf.internal import wire_format, encoder, decoder
-
 import blackboxprotobuf.lib
-from blackboxprotobuf.lib.types import varint
+from blackboxprotobuf.lib.types import varint, wiretypes
 from blackboxprotobuf.lib.exceptions import (
     EncoderException,
     DecoderException,
@@ -108,6 +106,19 @@ def decode_string(value, pos):
         six.raise_from(
             DecoderException("Error decoding UTF-8 string %s" % value[pos:end]), exc
         )
+
+
+def encode_tag(field_number, wire_type):
+    # Not checking bounds here, should be check before
+    tag_number = (field_number << 3) | wire_type
+    return varint.encode_uvarint(tag_number)
+
+
+def decode_tag(buf, pos):
+    tag_number, pos = varint.decode_uvarint(buf, pos)
+    field_number = tag_number >> 3
+    wire_type = tag_number & 0x7
+    return field_number, wire_type, pos
 
 
 def encode_message(data, config, typedef, path=None, field_order=None):
@@ -268,7 +279,7 @@ def _encode_message_field(config, typedef, path, field_id, value):
                 )
 
     # Encode the tag
-    tag = encoder.TagBytes(
+    tag = encode_tag(
         int(field_number), blackboxprotobuf.lib.types.WIRETYPES[field_type]
     )
 
@@ -316,9 +327,9 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
         field_key = _get_field_key(field_number, typedef, path)
         # Easy cases. Fixed size or bytes/string
         if wire_type in [
-            wire_format.WIRETYPE_FIXED32,
-            wire_format.WIRETYPE_FIXED64,
-            wire_format.WIRETYPE_VARINT,
+            wiretypes.FIXED32,
+            wiretypes.FIXED64,
+            wiretypes.VARINT,
         ] or ("type" in field_typedef and field_typedef["type"] != "message"):
             if "type" not in field_typedef:
                 field_typedef["type"] = config.get_default_type(wire_type)
@@ -355,7 +366,7 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
             else:
                 output[field_key] = field_outputs
 
-        elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
+        elif wire_type == wiretypes.LENGTH_DELIMITED:
             _try_decode_lendelim_fields(
                 buffers, field_key, field_typedef, output, config
             )
@@ -381,8 +392,7 @@ def _group_by_number(buf, pos, end, path):
     field_order = []
     while pos < end:
         # Read in a field
-        tag, pos = varint.decode_uvarint(buf, pos)
-        field_number, wire_type = wire_format.UnpackTag(tag)
+        field_number, wire_type, pos = decode_tag(buf, pos)
 
         # We want field numbers as strings everywhere
         field_number = str(field_number)
@@ -398,22 +408,22 @@ def _group_by_number(buf, pos, end, path):
             )
 
         length = None
-        if wire_type == wire_format.WIRETYPE_VARINT:
+        if wire_type == wiretypes.VARINT:
             # We actually have to read in the whole varint to figure out it's size
             _, new_pos = varint.decode_varint(buf, pos)
             length = new_pos - pos
-        elif wire_type == wire_format.WIRETYPE_FIXED32:
+        elif wire_type == wiretypes.FIXED32:
             length = 4
-        elif wire_type == wire_format.WIRETYPE_FIXED64:
+        elif wire_type == wiretypes.FIXED64:
             length = 8
-        elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
+        elif wire_type == wiretypes.LENGTH_DELIMITED:
             # Read the length from the start of the message
             # add on the length of the length tag as well
             bytes_length, new_pos = varint.decode_varint(buf, pos)
             length = bytes_length + (new_pos - pos)
         elif wire_type in [
-            wire_format.WIRETYPE_START_GROUP,
-            wire_format.WIRETYPE_END_GROUP,
+            wiretypes.START_GROUP,
+            wiretypes.END_GROUP,
         ]:
             raise DecoderException("GROUP wire types not supported", path=path)
         else:

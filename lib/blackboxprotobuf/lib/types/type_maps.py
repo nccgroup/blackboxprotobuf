@@ -22,8 +22,7 @@ functions, wiretypes and default types
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from google.protobuf.internal import wire_format
-from blackboxprotobuf.lib.types import varint, fixed, length_delim
+from blackboxprotobuf.lib.types import varint, fixed, length_delim, wiretypes
 
 # Map a blackboxprotobuf type to specific encoder
 ENCODERS = {
@@ -76,38 +75,38 @@ DECODERS = {
 }
 
 WIRETYPES = {
-    "uint": wire_format.WIRETYPE_VARINT,
-    "int": wire_format.WIRETYPE_VARINT,
-    "sint": wire_format.WIRETYPE_VARINT,
-    "fixed32": wire_format.WIRETYPE_FIXED32,
-    "sfixed32": wire_format.WIRETYPE_FIXED32,
-    "float": wire_format.WIRETYPE_FIXED32,
-    "fixed64": wire_format.WIRETYPE_FIXED64,
-    "sfixed64": wire_format.WIRETYPE_FIXED64,
-    "double": wire_format.WIRETYPE_FIXED64,
-    "bytes": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "bytes_hex": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "string": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "message": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "group": wire_format.WIRETYPE_START_GROUP,
-    "packed_uint": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_int": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_sint": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_fixed32": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_sfixed32": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_float": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_fixed64": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_sfixed64": wire_format.WIRETYPE_LENGTH_DELIMITED,
-    "packed_double": wire_format.WIRETYPE_LENGTH_DELIMITED,
+    "uint": wiretypes.VARINT,
+    "int": wiretypes.VARINT,
+    "sint": wiretypes.VARINT,
+    "fixed32": wiretypes.FIXED32,
+    "sfixed32": wiretypes.FIXED32,
+    "float": wiretypes.FIXED32,
+    "fixed64": wiretypes.FIXED64,
+    "sfixed64": wiretypes.FIXED64,
+    "double": wiretypes.FIXED64,
+    "bytes": wiretypes.LENGTH_DELIMITED,
+    "bytes_hex": wiretypes.LENGTH_DELIMITED,
+    "string": wiretypes.LENGTH_DELIMITED,
+    "message": wiretypes.LENGTH_DELIMITED,
+    "group": wiretypes.START_GROUP,
+    "packed_uint": wiretypes.LENGTH_DELIMITED,
+    "packed_int": wiretypes.LENGTH_DELIMITED,
+    "packed_sint": wiretypes.LENGTH_DELIMITED,
+    "packed_fixed32": wiretypes.LENGTH_DELIMITED,
+    "packed_sfixed32": wiretypes.LENGTH_DELIMITED,
+    "packed_float": wiretypes.LENGTH_DELIMITED,
+    "packed_fixed64": wiretypes.LENGTH_DELIMITED,
+    "packed_sfixed64": wiretypes.LENGTH_DELIMITED,
+    "packed_double": wiretypes.LENGTH_DELIMITED,
 }
 
 # Default values to use when decoding each wire type
 # length delimited is special and handled in the length_delim module
 WIRE_TYPE_DEFAULTS = {
-    wire_format.WIRETYPE_VARINT: "int",
-    wire_format.WIRETYPE_FIXED32: "fixed32",
-    wire_format.WIRETYPE_FIXED64: "fixed64",
-    wire_format.WIRETYPE_LENGTH_DELIMITED: None,
-    wire_format.WIRETYPE_START_GROUP: None,
-    wire_format.WIRETYPE_END_GROUP: None,
+    wiretypes.VARINT: "int",
+    wiretypes.FIXED32: "fixed32",
+    wiretypes.FIXED64: "fixed64",
+    wiretypes.LENGTH_DELIMITED: None,
+    wiretypes.START_GROUP: None,
+    wiretypes.END_GROUP: None,
 }

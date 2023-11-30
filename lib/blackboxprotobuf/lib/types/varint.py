@@ -22,8 +22,6 @@
 
 import binascii
 import struct
-
-from google.protobuf.internal import wire_format, encoder, decoder
 import six
 
 from blackboxprotobuf.lib.exceptions import EncoderException, DecoderException
@@ -33,18 +31,6 @@ from blackboxprotobuf.lib.exceptions import EncoderException, DecoderException
 # But this is enforced by protobuf
 MAX_UVARINT = (1 << 64) - 1
 MAX_SVARINT = (1 << 63) - 1
-
-
-def _gen_append_bytearray(arr):
-    def _append_bytearray(x):
-        if isinstance(x, (str, int)):
-            arr.append(x)
-        elif isinstance(x, bytes):
-            arr.extend(x)
-        else:
-            raise EncoderException("Unknown type returned by protobuf library")
-
-    return _append_bytearray
 
 
 def encode_uvarint(value):
@@ -59,10 +45,16 @@ def encode_uvarint(value):
             "Error encoding %d as uvarint. Value must be %s or less"
             % (value, MAX_UVARINT)
         )
-    try:
-        encoder._EncodeVarint(_gen_append_bytearray(output), value)
-    except (struct.error, ValueError) as exc:
-        six.raise_from(EncoderException("Error encoding %d as uvarint." % value), exc)
+
+    if not value:
+        output.append(value & 0x7F)
+    else:
+        while value:
+            next_byte = value & 0x7F
+            value >>= 7
+            if value:
+                next_byte |= 0x80
+            output.append(next_byte)
 
     return output
 
@@ -72,19 +64,30 @@ def decode_uvarint(buf, pos):
     pos_start = pos
     # Convert buffer to string
     if six.PY2:
-        buf = str(buf)
+        buf = bytes(buf)
+
     try:
-        value, pos = decoder._DecodeVarint(buf, pos)
-    except (TypeError, IndexError, decoder._DecodeError) as exc:
-        six.raise_from(
-            DecoderException(
-                "Error decoding uvarint from %s..."
-                % binascii.hexlify(buf[pos : pos + 8])
-            ),
-            exc,
+        value = 0
+        shift = 0
+        while six.indexbytes(buf, pos) & 0x80:
+            value += (six.indexbytes(buf, pos) & 0x7F) << (shift * 7)
+            pos += 1
+            shift += 1
+        value += (six.indexbytes(buf, pos) & 0x7F) << (shift * 7)
+        pos += 1
+    except IndexError:
+        raise DecoderException(
+            "Error decoding uvarint: read past the end of the buffer"
         )
+
     # Validate that this is a cononical encoding by re-encoding the value
-    test_encode = encode_uvarint(value)
+    try:
+        test_encode = encode_uvarint(value)
+    except EncoderException as ex:
+        raise DecoderException(
+            "Error decoding varint: value (%s) was not able to be re-encoded: %s"
+            % (value, ex)
+        )
     if buf[pos_start:pos] != test_encode:
         raise DecoderException(
             "Error decoding uvarint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
@@ -96,18 +99,14 @@ def decode_uvarint(buf, pos):
 
 def encode_varint(value):
     """Encode a long or int into a bytearray."""
-    output = bytearray()
     if abs(value) > MAX_SVARINT:
         raise EncoderException(
-            "Error encoding %d as uarint. Value must be %s or less (abs)"
+            "Error encoding %d as varint. Value must be %s or less (abs)"
             % (value, MAX_SVARINT)
         )
-    try:
-        encoder._EncodeSignedVarint(_gen_append_bytearray(output), value)
-    except (struct.error, ValueError) as exc:
-        six.raise_from(
-            EncoderException("Error encoding %d as signed varint." % value), exc
-        )
+    if value < 0:
+        value += 1 << 64
+    output = encode_uvarint(value)
     return output
 
 
@@ -116,25 +115,40 @@ def decode_varint(buf, pos):
     # Convert buffer to string
     pos_start = pos
     if six.PY2:
-        buf = str(buf)
-    try:
-        value, pos = decoder._DecodeSignedVarint(buf, pos)
-    except (TypeError, IndexError, decoder._DecodeError) as exc:
-        six.raise_from(
-            DecoderException(
-                "Error decoding varint from %s..."
-                % binascii.hexlify(buf[pos : pos + 8])
-            ),
-            exc,
-        )
+        buf = bytes(buf)
+
+    value, pos = decode_uvarint(buf, pos)
+    if value & (1 << 63):
+        value -= 1 << 64
+
     # Validate that this is a cononical encoding by re-encoding the value
-    test_encode = encode_varint(value)
+    try:
+        test_encode = encode_varint(value)
+    except EncoderException as ex:
+        raise DecoderException(
+            "Error decoding varint: value (%s) was not able to be re-encoded: %s"
+            % (value, ex)
+        )
+
     if buf[pos_start:pos] != test_encode:
         raise DecoderException(
             "Error decoding varint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
             % (buf[pos_start:pos], test_encode)
         )
     return (value, pos)
+
+
+def encode_zig_zag(value):
+    if value < 0:
+        return (abs(value) << 1) - 1
+    return value << 1
+
+
+def decode_zig_zag(value):
+    if value & 0x1:
+        # negative
+        return -((value + 1) >> 1)
+    return value >> 1
 
 
 def encode_svarint(value):
@@ -145,7 +159,7 @@ def encode_svarint(value):
             "Error encoding %d as svarint. Value must be %s or less (abs)"
             % (value, MAX_SVARINT)
         )
-    return encode_uvarint(wire_format.ZigZagEncode(value))
+    return encode_uvarint(encode_zig_zag(value))
 
 
 def decode_svarint(buf, pos):
@@ -153,8 +167,7 @@ def decode_svarint(buf, pos):
     pos_start = pos
 
     output, pos = decode_uvarint(buf, pos)
-    # zigzag encode value
-    value = wire_format.ZigZagDecode(output)
+    value = decode_zig_zag(output)
 
     # Validate that this is a cononical encoding by re-encoding the value
     test_encode = encode_svarint(value)
