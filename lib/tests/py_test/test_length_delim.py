@@ -120,6 +120,8 @@ def test_anon_decode(x):
 
     def check_message(orig, orig_typedef, new, new_typedef):
         for field_number in set(orig.keys()) | set(new.keys()):
+            # Skip cases where we accidentally wind up with an alt-typedef
+            assume("-" not in field_number)
             # verify all fields are there
             assert field_number in orig
             assert field_number in orig_typedef
