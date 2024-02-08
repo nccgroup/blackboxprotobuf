@@ -50,6 +50,8 @@ from blackboxprotobuf.lib.exceptions import (
     EncoderException,
 )
 
+from threading import Thread
+
 NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
 
 
@@ -154,8 +156,15 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             # Resets state
             return self._original_content
 
-    def setMessage(self, content, is_request, retry=True):
-        """Get the data from the request/response and parse into JSON."""
+    def _set_proto_message(self, content, is_request, retry=True):
+        """
+        Sets the protobuf message for the editor.
+
+        Args:
+            content (bytes): The content of the message.
+            is_request (bool): Indicates whether the message is a request or a response.
+            retry (bool, optional): Indicates whether to retry setting the message if decoding fails. Defaults to True.
+        """
         # Save original content
         self._original_content = content
         if is_request:
@@ -233,6 +242,19 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         if self.message_type_name:
             self.forceSelectType(self.message_type_name)
+
+    def setMessage(self, content, is_request, retry=True):
+        """
+        Get the data from the request/response and parse into JSON.
+        """
+
+        # Run in a separate thread to avoid hanging the Burp UI
+        # It has been observed that the Burp UI can hang when the message is large
+        # and the decoding process takes a long time
+        self._text_editor.setText("Please wait...")
+        Thread(
+            target=self._set_proto_message, args=((content, is_request, False))
+        ).start()
 
     def decodePayload(self, payload):
         """Add support for decoding a few default methods. Including Base64 and GZIP"""
