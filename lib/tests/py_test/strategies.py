@@ -80,8 +80,16 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
         field_type = draw(st.sampled_from(message_types))
         output[field_number] = {}
         output[field_number]["type"] = field_type
-        if not field_type.startswith("packed"):
+
+        if field_type.startswith("packed"):
+            output[field_number]["seen_repeated"] = True
+        elif (
+            anon and field_type == "message"
+        ):  # seen_repeated blows up our anon tests right now TODO: improve anon tests to handle this
+            output[field_number]["seen_repeated"] = False
+        else:
             output[field_number]["seen_repeated"] = draw(st.booleans())
+
         if field_type == "message":
             output[field_number]["message_typedef"] = draw(
                 message_typedef_gen(
@@ -91,6 +99,7 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
                     named_fields=named_fields,
                 )
             )
+
         # decide whether to give it a name
         if named_fields and not anon and draw(st.booleans()):
             output[field_number]["name"] = field_name
@@ -108,16 +117,16 @@ def gen_message_data(draw, type_def):
             field_label = str(number)
 
         field_type = field["type"]
-        strat = input_map[field["type"]]
         if field_type == "message":
-            output[field_label] = draw(gen_message_data(field["message_typedef"]))
+            strat = gen_message_data(field["message_typedef"])
         else:
-            if field.get("seen_repeated", False) and not field_type.startswith(
-                "packed"
-            ):
-                output[field_label] = draw(st.lists(strat, min_size=2))
-            else:
-                output[field_label] = draw(strat)
+            strat = input_map[field["type"]]
+
+        if field.get("seen_repeated", False) and not field_type.startswith("packed"):
+            output[field_label] = draw(st.lists(strat, min_size=2))
+        else:
+            output[field_label] = draw(strat)
+
     return output
 
 

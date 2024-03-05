@@ -238,7 +238,7 @@ def test_message_guess_inverse(x):
 
 
 @given(bytes_in=st.binary())
-def test_message_guess_inverse(bytes_in):
+def test_message_guess_bytes(bytes_in):
     # Test that a given byte array can be decoded anonymously then re-encoded to the same bytes
 
     config = Config()
@@ -256,7 +256,7 @@ def test_message_guess_inverse(bytes_in):
     assert bytes_in == bytes_out
 
 
-@given(x=strategies.gen_message(), rng=st.randoms())
+@given(x=strategies.gen_message(anon=True), rng=st.randoms())
 def test_message_ordering(x, rng):
     # messages need to preserve field ordering when encoding then decoding
     # ordering technically shouldn't matter in a protobuf message, but if we
@@ -366,3 +366,49 @@ def test_packed_double_inverse(x):
     assert isinstance(encoded, bytearray)
     assert pos == len(encoded)
     assert x == decoded
+
+
+def test_seen_repeated():
+    # Make sure seen_repeated gets set and perserved
+    config = Config()
+
+    message = {"1": [1, 2, 3], "2": [{"1": 1}, {"1": 1}]}
+    typedef = {
+        "1": {"type": "int"},
+        "2": {"type": "message", "message_typedef": {"1": {"type": "int"}}},
+    }
+
+    # Make sure we set seen_repeated for lists with multiple items
+    encoded = length_delim.encode_lendelim_message(message, config, typedef)
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, typedef, 0
+    )
+    assert "seen_repeated" in typedef_out["1"]
+    assert typedef_out["1"]["seen_repeated"]
+    assert "seen_repeated" in typedef_out["2"]
+    assert typedef_out["2"]["seen_repeated"]
+
+    message = {"1": 1, "2": {"1": 1}}
+    encoded = length_delim.encode_lendelim_message(message, config, typedef)
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, typedef, 0
+    )
+    # Make sure we don't set seen_repeated for single
+    assert "seen_repeated" not in typedef_out["1"]
+    assert "seen_repeated" not in typedef_out["2"]
+
+    typedef["1"]["seen_repeated"] = True
+    typedef["2"]["seen_repeated"] = True
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, typedef, 0
+    )
+    # Make sure we preserve seen_repeated and output as a list
+    assert "seen_repeated" in typedef_out["1"]
+    assert typedef_out["1"]["seen_repeated"]
+    # Make sure our output is a list, even though it only has one list
+    assert isinstance(decoded["1"], list)
+
+    assert "seen_repeated" in typedef_out["2"]
+    assert typedef_out["2"]["seen_repeated"]
+    # Make sure our output is a list, even though it only has one list
+    assert isinstance(decoded["2"], list)
