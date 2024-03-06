@@ -361,10 +361,21 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
                 assert len(buf) == _pos
 
             field_outputs = [value for (value, _) in field_outputs]
-            if len(field_outputs) == 1:
-                output[field_key] = field_outputs[0]
-            else:
+
+            # Packed decoding will return a list of lists
+            if field_typedef["type"].startswith("packed_"):
+                field_outputs = [y for x in field_outputs for y in x]
+                field_typedef[
+                    "seen_repeated"
+                ] = True  # packed fields are always repeated
+
+            # Convert to a single element if theres only 1 field and we've
+            # never seen it repeated before
+            if len(field_outputs) > 1 or field_typedef.get("seen_repeated", False):
                 output[field_key] = field_outputs
+                field_typedef["seen_repeated"] = True
+            else:
+                output[field_key] = field_outputs[0]
 
         elif wire_type == wiretypes.LENGTH_DELIMITED:
             _try_decode_lendelim_fields(
@@ -554,9 +565,12 @@ def _try_decode_lendelim_fields(
             output_field_key = field_key
             if output_typedef_num != "1":
                 output_field_key += "-" + output_typedef_num
-            message_output[output_field_key] = (
-                outputs if len(outputs) > 1 else outputs[0]
-            )
+
+            if len(outputs) > 1 or field_typedef.get("seen_repeated", False):
+                message_output[output_field_key] = outputs
+                field_typedef["seen_repeated"] = True
+            else:
+                message_output[output_field_key] = outputs[0]
         # success, return
         return
     except DecoderException as exc:
