@@ -29,6 +29,7 @@ import traceback
 import burp
 import json
 from javax.swing import DefaultListModel
+from java.util.concurrent import Executors
 
 
 # Add correct directory to sys.path
@@ -59,6 +60,8 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
         # TODO bundle them together so it doesn't have to be manually updated
         self.known_message_model = DefaultListModel()
         self.refresh_message_model()
+
+        self.thread_executor = Executors.newCachedThreadPool()
 
     def refresh_message_model(self):
         self.known_message_model.clear()
@@ -107,16 +110,18 @@ class BurpExtender(burp.IBurpExtender, burp.IExtensionStateListener):
         )
 
     def extensionUnloaded(self):
+        self.thread_executor.shutdownNow()
         self.saveKnownMessages()
         for window in self.open_windows:
             window.exitTypeWindow()
 
-    def open_typedef_editor(self, message_type, callback):
+    def open_typedef_editor(self, message_type, source, callback):
         self.open_windows = [window for window in self.open_windows if window.is_open]
 
         window = typedef_editor.TypeEditorWindow(
             self.callbacks,
             message_type,
+            source,
             callback,
         )
         window.show()

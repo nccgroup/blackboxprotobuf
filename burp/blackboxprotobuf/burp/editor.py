@@ -50,8 +50,6 @@ from blackboxprotobuf.lib.exceptions import (
     EncoderException,
 )
 
-from threading import Thread
-
 NAME_REGEX = re.compile(r"\A[a-zA-Z_][a-zA-Z0-9_]*\Z")
 
 
@@ -75,7 +73,6 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
     """
 
     def __init__(self, extension, controller, editable, callbacks):
-
         self._callbacks = callbacks
         self._extension = extension
         self._callbacks = extension.callbacks
@@ -104,16 +101,10 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._component.setRightComponent(self.createButtonPane())
         self._component.setResizeWeight(0.95)
 
-        self.message_type = None
-        self._is_request = None
-        self._encoder = None
-        self._original_json = None
-        self._original_typedef = None
-        self._last_set_json = ""
-        self._content_info = None
-        self._request_content_info = None
-        self._request = None
-        self._original_content = None
+        self._message_info = None
+        self._payload_info = None
+        self._last_good_msg = None  # (msg, typedef, source)
+        self._decode_task = None
 
     def getTabCaption(self):
         """Return message tab caption"""
@@ -121,111 +112,76 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def getMessage(self):
         """Transform the JSON format back to the binary protobuf message"""
+        # Noticing this gets called twice for some reason
+        # If we haven't finished decoding the message, cancel and return the original content
+        if self._decode_task and (
+            not self._decode_task.isDone() or self._decode_task.isCancelled()
+        ):
+            self._decode_task.cancel(True)
+            self._decode_task = None
+            # self._callbacks.printOutput(
+            #    "Called getMessage before decode task was done, returning original content"
+            # )
+            return self._message_info.content()
+
+        if self._last_good is None or not self.isModified():
+            return self._message_info.content()
+
+        success = False
         try:
-            if self.message_type is None or not self.isModified():
-                return self._original_content
-
             json_data = self._text_editor.getText().tostring()
-
             protobuf_data = blackboxprotobuf.protobuf_from_json(
-                json_data, self.message_type
+                json_data, self._last_good.typedef
             )
 
-            protobuf_data = self.encodePayload(protobuf_data)
-            if "set_protobuf_data" in dir(user_funcs):
-                result = user_funcs.set_protobuf_data(
-                    protobuf_data,
-                    self._original_content,
-                    self._is_request,
-                    self._content_info,
-                    self._helpers,
-                    self._request,
-                    self._request_content_info,
-                )
-                if result is not None:
-                    return result
-
-            headers = self._content_info.getHeaders()
-            return self._helpers.buildHttpMessage(headers, str(protobuf_data))
+            success = True
+            self._payload_info.protobuf = protobuf_data
+            return self._payload_info.generate_http(self._message_info, self._helpers)
 
         except Exception as exc:
             self._callbacks.printError(traceback.format_exc())
-            JOptionPane.showMessageDialog(
-                self._component, "Error encoding protobuf: " + str(exc)
-            )
-            # Resets state
-            return self._original_content
 
-    def _set_proto_message(self, content, is_request, retry=True):
+        if not success:
+            try:
+                protobuf_data = blackboxprotobuf.protobuf_from_json(
+                    self._last_good.message, self._last_good.typedef
+                )
+
+                # Put the error here so that we only have one error to the user if the above encoding doesn't work
+                JOptionPane.showMessageDialog(
+                    self._component,
+                    "Error encoding protobuf as-is and data to previous good state: "
+                    + str(exc),
+                )
+
+                success = True
+                self._payload_info.protobuf = protobuf_data
+                return self._payload_info.generate_http(
+                    self._message_info, self._helpers
+                )
+            except Exception as exc:
+                self._callbacks.printError(traceback.format_exc())
+                JOptionPane.showMessageDialog(
+                    self._component,
+                    "Error encoding protobuf. Setting data to the original message. Error: "
+                    + str(exc),
+                )
+                return self._message_info.content()
+
+    def _handle_protobuf(
+        self, message_info, protobuf_data, message_type_in, typedef_source
+    ):
         """
         Sets the protobuf message for the editor.
-
-        Args:
-            content (bytes): The content of the message.
-            is_request (bool): Indicates whether the message is a request or a response.
-            retry (bool, optional): Indicates whether to retry setting the message if decoding fails. Defaults to True.
         """
-        # Save original content
-        self._original_content = content
-        if is_request:
-            self._content_info = self._helpers.analyzeRequest(
-                self._controller.getHttpService(), content
-            )
-        else:
-            self._content_info = self._helpers.analyzeResponse(content)
-        self._is_request = is_request
-        self._request = None
-        self._request_content_info = None
-
-        if not is_request:
-            self._request = self._controller.getRequest()
-            self._request_content_info = self._helpers.analyzeRequest(
-                self._controller.getHttpService(), self._request
-            )
-
-        # how we remember which message type correlates to which endpoint
-        self._message_hash = self.getMessageHash()
-
-        # Try to find saved messsage type
-        self.message_type = None
-        self.message_type_name = None
-        if self._message_hash in self._extension.saved_types:
-            typename = self._extension.saved_types[self._message_hash]
-            if typename in default_config.known_types:
-                self.message_type_name = typename
-                self.message_type = default_config.known_types[typename]
-            else:
-                del self._extension.saved_types[self._message_hash]
-
         try:
-            protobuf_data = None
-            if "get_protobuf_data" in dir(user_funcs):
-                protobuf_data = user_funcs.get_protobuf_data(
-                    content,
-                    is_request,
-                    self._content_info,
-                    self._helpers,
-                    self._request,
-                    self._request_content_info,
-                )
-            if protobuf_data is None:
-                protobuf_data = content[self._content_info.getBodyOffset() :].tostring()
-
-            protobuf_data = self.decodePayload(protobuf_data)
-
-            # source_typedef will be the original, updatable version of the dict
-            # TODO fix this hack
-            self._original_data = protobuf_data
-            self._filtered_message_model.set_new_data(protobuf_data)
-            self._source_typedef = self.message_type
-            json_data, self.message_type = blackboxprotobuf.protobuf_to_json(
-                protobuf_data, self.message_type
+            json_data, message_type = blackboxprotobuf.protobuf_to_json(
+                protobuf_data, message_type_in
             )
 
-            self._original_json = json_data
-            self._original_typedef = self.message_type
-            self._last_set_json = str(json_data)
-            self._text_editor.setText(json_data)
+            self._last_good = LastGoodData(json_data, message_type, typedef_source)
+            self._filtered_message_model.set_new_data(protobuf_data)
+            self._text_editor.setText(json_data)  # UI access
             success = True
         except Exception as exc:
             success = False
@@ -233,83 +189,78 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 "Got error decoding protobuf binary: " + traceback.format_exc()
             )
 
-        # Bring out of exception handler to avoid nexting handlers
-        if not success:
-            if self._message_hash in self._extension.saved_types:
-                del self._extension.saved_types[self._message_hash]
-                self.setMessage(content, is_request, False)
-                self._text_editor.setText("Error decoding protobuf")
+        # Bring out of exception handler to avoid nesting handlers
+        if success:
+            if typedef_source is not None:
+                self.forceSelectType(typedef_source)
+            else:
+                self._type_list_component.clearSelection()
+        elif len(message_type_in) == 0:
+            self._callbacks.printError(
+                "Error decoding protobuf with saved type, trying with empty type"
+            )
+            self._handle_protobuf(message_info, protobuf_data, {}, None)
+        else:
+            self._callbacks.printError("Error decoding protobuf with empty type")
+            self._text_editor.setText("Error decoding protobuf")
 
-        if self.message_type_name:
-            self.forceSelectType(self.message_type_name)
-
-    def setMessage(self, content, is_request, retry=True):
+    def setMessage(self, content, is_request):
         """
         Get the data from the request/response and parse into JSON.
         """
-
         # Run in a separate thread to avoid hanging the Burp UI
         # It has been observed that the Burp UI can hang when the message is large
         # and the decoding process takes a long time
+
+        message_info = MessageInfo(content, is_request, self._helpers, self._controller)
+        payload_info = PayloadInfo(message_info, self._helpers)
+        message_type, typedef_source = self._get_saved_typedef(message_info)
+
+        if (
+            self._decode_task
+            and not self._decode_task.isCancelled()
+            and not self._decode_task.isDone()
+        ):
+            # If we're processing the same message as the running task
+            # check message has
+            # check protobuf data
+            # TODO do we want to check typedef? Can switch away and back to restart it if we need to
+            if (
+                message_info.message_hash == self._message_info.message_hash
+                and payload_info.protobuf == self._payload_info.protobuf
+            ):
+                # self._callbacks.printOutput(
+                #    "Switched to tab that is still running with the same hash and payload. Not cancelling."
+                # )
+                return
+            else:
+                # self._callbacks.printOutput(
+                #    "Have existing task that is still running, cancelling"
+                # )
+                # Cancel the old task
+                self._decode_task.cancel(True)
+
+        self._message_info = message_info
+        self._payload_info = payload_info
+        self._last_good_msg = None
+        self._decode_task = None
+
         self._text_editor.setText("Please wait...")
-        Thread(
-            target=self._set_proto_message, args=((content, is_request, False))
-        ).start()
 
-    def decodePayload(self, payload):
-        """Add support for decoding a few default methods. Including Base64 and GZIP"""
-        if payload.startswith(bytearray([0x1F, 0x8B, 0x08])):
-            gzip_decompress = zlib.decompressobj(-zlib.MAX_WBITS)
-            self._encoder = "gzip"
-            return gzip_decompress.decompress(payload)
+        def run():
+            try:
+                self._handle_protobuf(
+                    message_info,
+                    payload_info.protobuf,
+                    message_type,
+                    typedef_source,
+                )
+            except Exception as ex:
+                # Catch all, otherwise it disappears
+                self._text_editor.setText("Error decoding protobuf")
+                self._callbacks.printError("Error decoding protobuf: %s" % ex)
 
-        # Try to base64 decode
-        # TODO base64 lib is a little to flexible with parsing. Would be good
-        # to handle base64 + "web safe" base64, but need better validation and
-        # parsing
-        #try:
-        #    protobuf = base64.b64decode(payload, validate=True)
-        #    self._encoder = "base64"
-        #    return protobuf
-        #except Exception as exc:
-        #    pass
-
-        # try decoding as a gRPC payload: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
-        # we're naiively handling only uncompressed payloads
-        if len(payload) > 1 + 4 and payload.startswith(
-            bytearray([0x00])
-        ):  # gRPC has 1 byte flag + 4 byte length
-            (message_length,) = struct.unpack_from(">I", payload[1:])
-            if len(payload) == 1 + 4 + message_length:
-                self._encoder = "gRPC"
-                return payload[1 + 4 :]
-        # try:
-        #    protobuf = base64.urlsafe_b64decode(payload)
-        #    self._encoder = 'base64_url'
-        #    return protobuf
-        # except Exception as exc:
-        #    pass
-
-        self._encoder = None
-        return payload
-
-    def encodePayload(self, payload):
-        """If we detected an encoding like gzip or base64 when decoding, redo
-        that encoding step here
-        """
-        if self._encoder == "base64":
-            return base64.b64encode(payload)
-        elif self._encoder == "base64_url":
-            return base64.urlsafe_b64encode(payload)
-        elif self._encoder == "gzip":
-            gzip_compress = zlib.compressobj(-1, zlib.DEFLATED, -zlib.MAX_WBITS)
-            self._encoder = "gzip"
-            return gzip_compress.compress(payload)
-        elif self._encoder == "gRPC":
-            message_length = struct.pack(">I", len(payload))
-            return bytearray([0x00]) + bytearray(message_length) + payload
-        else:
-            return payload
+        self._decode_task = self._extension.thread_executor.submit(run)
 
     def getSelectedData(self):
         """Get text currently selected in message"""
@@ -431,46 +382,26 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         """
         try:
             json_data = self._text_editor.getText().tostring()
-            blackboxprotobuf.protobuf_from_json(json_data, self.message_type)
+            typedef = self._last_good.typedef
+            protobuf_data = blackboxprotobuf.protobuf_from_json(json_data, typedef)
             # If it works, save the message
-            self._original_json = json_data
-            self._original_typedef = self.message_type
+            # Don't need to save typeddef because we're using the one from lastgood
+            self._last_good.message = json_data
+            self._payload_info.protobuf = protobuf_data
+
         except Exception as exc:
-            JOptionPane.showMessageDialog(self._component, str(exc))
+            JOptionPane.showMessageDialog(
+                self._component,
+                "Got exception while trying to encode the message: " + str(exc),
+            )
             self._callbacks.printError(traceback.format_exc())
 
     def resetMessage(self):
-        """Drop any changes and reset the message. Callback for "reset"
-        button
+        """Drop any changes and revert to the last good message. Callback for
+        "reset" button
         """
 
-        self._last_set_json = str(self._original_json)
-        self._text_editor.setText(self._original_json)
-        self.message_type = self._original_typedef
-
-    def getMessageHash(self):
-        """Compute an "identifier" for the message which is used for sticky
-        type definitions. User modifiable
-        """
-        message_hash = None
-        if "hash_message" in dir(user_funcs):
-            message_hash = user_funcs.hash_message(
-                self._original_content,
-                self._is_request,
-                self._content_info,
-                self._helpers,
-                self._request,
-                self._request_content_info,
-            )
-        if message_hash is None:
-            # Base it off just the URL and request/response
-
-            content_info = (
-                self._content_info if self._is_request else self._request_content_info
-            )
-            url = content_info.getUrl().getPath()
-            message_hash = ":".join([url, str(self._is_request)])
-        return message_hash
+        self._text_editor.setText(self._last_good.message)
 
     def forceSelectType(self, typename):
         index = self._filtered_message_model.get_type_index(typename)
@@ -480,10 +411,16 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
     def updateTypeSelection(self):
         """Apply a new typedef based on the selected type in the type list"""
+        # TODO It sucks that we lose the anonymous type if we accidentally
+        # click a type. Maybe we should have an entry in the cached type in the
+        # list?
+        # Or have a warning before switching
+        # Or require a click + a button press?
+
         # Check if something is selected
         if self._type_list_component.isSelectionEmpty():
             self._last_valid_type_index = None
-            self._extension.saved_types.pop(self._message_hash, None)
+            self._extension.saved_types.pop(self._message_info.message_hash, None)
             return
 
         # TODO won't actually work right if we delete the type we're using a
@@ -499,7 +436,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             return
 
         try:
-            self.applyType(default_config.known_types[type_name])
+            self.applyType(default_config.known_types[type_name], type_name)
         except BlackboxProtobufException as exc:
             self._callbacks.printError(traceback.format_exc())
 
@@ -524,46 +461,59 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 self._type_list_component.clearSelection()
             return
 
-        self._extension.saved_types[self._message_hash] = type_name
+        self._extension.saved_types[self._message_info.message_hash] = type_name
         self._last_valid_type_index = self._type_list_component.getSelectedIndex()
 
-    def editType(self, typedef):
-        """Apply the new typedef. Use dict.update to change the original
-        dictionary, so we also update the anonymous cached definition and ones
-        stored in known_messages"""
-        # TODO this is kind of an ugly hack. Should redo how these are referenced
-        # probably means rewriting a bunch of the editor
-        old_source = self._source_typedef
-        if old_source is None:
-            old_source = {}
-        old_source.clear()
-        old_source.update(typedef)
-        self.applyType(old_source)
+    def editType(self, typedef, source):
+        """Apply and save the new typedef"""
+        # Try to apply the type first
+        try:
+            # TODO Background this like with handle_protobuf? I think we need
+            # to be more confident that we can validate the typedef without
+            # decoding first
+            # The decoding here throws an exception that will prevent us from
+            # closing the typedef editor window if it's not valid
+            self.applyType(typedef, source)
+        except BlackboxProtobufException as exc:
+            self._callbacks.printError("Got exception trying to apply edited typedef.")
+            JOptionPane.showMessageDialog(
+                self._component,
+                "Error decoding the protobuf with the new type: %s" % (exc),
+            )
+            return
 
-    def applyType(self, typedef):
+        if source is None:
+            # Anonymous typedef tied to message hash
+            # save the typedef
+            self._extension.saved_types[self._message_info.message_hash] = typedef
+        else:
+            # Named typedef
+            # save under known typedefs and save the name in source
+            default_config.known_types[source] = typedef
+            self._extension.saved_types[self._message_info.message_hash] = source
+
+    def applyType(self, typedef, source):
         """Apply a new typedef to the message. Throws an exception if type is invalid."""
-        # store a reference for later mutation?
-        self._source_typedef = typedef
         # Convert to protobuf as old type and re-interpret as new type
-        old_message_type = self.message_type
+        old_typedef = self._last_good.typedef
         json_data = self._text_editor.getText().tostring()
-        protobuf_data = blackboxprotobuf.protobuf_from_json(json_data, old_message_type)
 
-        new_json, message_type = blackboxprotobuf.protobuf_to_json(
+        protobuf_data = blackboxprotobuf.protobuf_from_json(json_data, old_typedef)
+        self._payload_info.protobuf = protobuf_data
+
+        new_json, new_typedef = blackboxprotobuf.protobuf_to_json(
             str(protobuf_data), typedef
         )
 
-        # Should exception out before now if there is an issue
-        self.message_type = message_type
+        self._last_good = LastGoodData(new_json, new_typedef, source)
 
-        # if the json data was modified, then re-check our types
-        if json_data != self._last_set_json:
-            self._filtered_message_model.set_new_data(protobuf_data)
-        self._last_set_json = str(new_json)
+        self._filtered_message_model.set_new_data(protobuf_data)
         self._text_editor.setText(str(new_json))
+        # We do not try to remember the type here, this should be handled by the caller
 
     def saveAsNewType(self):
         """Copy the current type into known_messages"""
+
         name = self._new_type_field.getText().strip()
         if not NAME_REGEX.match(name):
             JOptionPane.showMessageDialog(
@@ -578,23 +528,54 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             )
             return
 
+        typedef = self._last_good.typedef
+
         # Do a deep copy on the dictionary so we don't accidentally modify others
-        default_config.known_types[name] = copy.deepcopy(self.message_type)
+        default_config.known_types[name] = copy.deepcopy(typedef)
+        self._last_good.source = name  # remember the source, typedef is still the same
+
         # update the list of messages. This should trickle down to known message model
         self._extension.known_message_model.addElement(name)
         self._new_type_field.setText("")
-        self._extension.saved_types[self._message_hash] = name
+        self._extension.saved_types[self._message_info.message_hash] = name
 
         # force select our new type
         self.forceSelectType(name)
 
     def clearType(self):
-        self.applyType({})
+        self.applyType({}, None)
         self._type_list_component.clearSelection()
         self._new_type_field.setText("")
+        self._extension.saved_types.pop(self._message_info.message_hash, None)
 
     def open_typedef_window(self):
-        self._extension.open_typedef_editor(self.message_type, self.editType)
+        typedef = self._last_good.typedef
+        source = self._last_good.source
+        self._extension.open_typedef_editor(typedef, source, self.editType)
+
+    def _get_saved_typedef(self, message_info):
+        # Get the typedef we have saved for this message
+        # It can be anonymous, but saved based on the message hash
+        # Or it can be named
+        # Return typedef, typename tuple
+        if message_info.message_hash in self._extension.saved_types:
+            saved_type = self._extension.saved_types[message_info.message_hash]
+            if isinstance(saved_type, dict):
+                return saved_type, None
+            elif saved_type in default_config.known_types:
+                typename = saved_type
+                typedef = default_config.known_types[typename]
+                return typedef, typename
+            else:
+                # We had a type, but it isn't a dict and not in known types
+                # Error, so clear
+                self._extension.saved_types.pop(message_info.message_hash, None)
+                self._callbacks.printError(
+                    "Found unknown saved type: %s for %s"
+                    % (typename, message_info.message_hash)
+                )
+        else:
+            return {}, None
 
 
 class EditorButtonListener(ActionListener):
@@ -738,6 +719,9 @@ class FilteredMessageModel(ListModel, ListDataListener):
                 listener.intervalRemoved(event)
 
     def _check_type(self, typename):
+        # TODO this hangs the UI as well
+        # TODO would be better to check by comparing typedefs instead of trying
+        # to decode
         if typename in self._rejected_types:
             return False
         if typename in self._working_types:
@@ -779,3 +763,141 @@ class FilteredMessageModel(ListModel, ListDataListener):
 
     def intervalRemoved(self, event):
         self.update_types()
+
+
+class MessageInfo:
+    """This class parses the data we get from burp for us to use throughout the processing"""
+
+    def __init__(self, content, is_request, helpers, controller):
+        self.is_request = is_request
+
+        if is_request:
+            self.request = content
+        else:
+            self.request = controller.getRequest()
+
+            self.response = content
+            self.response_content_info = helpers.analyzeResponse(content)
+
+        self.request_content_info = helpers.analyzeRequest(
+            controller.getHttpService(), self.request
+        )
+
+        self.message_hash = self._message_hash(helpers)
+
+    def content(self):
+        if self.is_request:
+            return self.request
+        else:
+            return self.response
+
+    def content_info(self):
+        if self.is_request:
+            return self.request_content_info
+        else:
+            return self.response_content_info
+
+    def _message_hash(self, helpers):
+        """Compute an "identifier" for the message which is used for sticky
+        type definitions. User modifiable
+        """
+        message_hash = None
+        if "hash_message" in dir(user_funcs):
+            message_hash = user_funcs.hash_message(
+                self.content(),
+                self.is_request,
+                self.content_info(),
+                helpers,
+                self.request,
+                self.request_content_info,
+            )
+        if message_hash is None:
+            # Base it off just the URL and request/response
+            url = self.request_content_info.getUrl().getPath()
+            message_hash = ":".join([url, str(self.is_request)])
+
+        return message_hash
+
+
+class PayloadInfo:
+    """This class stores the latest payload data and functions to transform it to or from a HTTP message"""
+
+    def __init__(self, message_info, helpers):
+        self.protobuf = None
+        self.parse_http(message_info, helpers)
+
+    def parse_http(self, message_info, helpers):
+        protobuf_data = None
+        if "get_protobuf_data" in dir(user_funcs):
+            protobuf_data = user_funcs.get_protobuf_data(
+                message_info.content(),
+                message_info.is_request,
+                message_info.content_info(),
+                helpers,
+                message_info.request,
+                message_info.request_content_info,
+            )
+        if protobuf_data is None:
+            protobuf_data = message_info.content()[
+                message_info.content_info().getBodyOffset() :
+            ].tostring()
+
+        encoder, protobuf = self._decode_payload(protobuf_data)
+        self.encoder = encoder
+        self.protobuf = protobuf
+
+    def generate_http(self, message_info, helpers):
+        protobuf_data = self._encode_payload()
+        if "set_protobuf_data" in dir(user_funcs):
+            result = user_funcs.set_protobuf_data(
+                protobuf_data,
+                message_info.content(),
+                message_info.is_request,
+                message_info.content_info(),
+                helpers,
+                message_info.request,
+                message_info.request_content_info,
+            )
+            if result is not None:
+                return result
+
+        headers = message_info.content_info().getHeaders()
+        return helpers.buildHttpMessage(headers, str(protobuf_data))
+
+    def _decode_payload(self, payload):
+        if payload.startswith(bytearray([0x1F, 0x8B, 0x08])):
+            gzip_decompress = zlib.decompressobj(-zlib.MAX_WBITS)
+            return "gzip", gzip_decompress.decompress(payload)
+
+        # try decoding as a gRPC payload: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+        # we're naiively handling only uncompressed payloads
+        if len(payload) > 1 + 4 and payload.startswith(
+            bytearray([0x00])
+        ):  # gRPC has 1 byte flag + 4 byte length
+            (message_length,) = struct.unpack_from(">I", payload[1:])
+            if len(payload) == 1 + 4 + message_length:
+                return "gRPC", payload[1 + 4 :]
+
+        # TODO would like to handle base64 for and websafe base64 here
+        return None, payload
+
+    def _encode_payload(self):
+        """Reverse decoding that we did before, either"""
+        payload = self.protobuf
+        if self.encoder == "gzip":
+            gzip_compress = zlib.compressobj(-1, zlib.DEFLATED, -zlib.MAX_WBITS)
+            return gzip_compress.compress(payload)
+        elif self.encoder == "gRPC":
+            message_length = struct.pack(">I", len(payload))
+            return bytearray([0x00]) + bytearray(message_length) + payload
+        else:
+            return payload
+
+
+class LastGoodData:
+    """This class stores data about the last now valid combination of message and typedef"""
+
+    def __init__(self, message, typedef, source):
+        self.message = message
+        self.typedef = typedef
+        self.source = source

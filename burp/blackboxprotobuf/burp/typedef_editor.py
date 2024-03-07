@@ -44,7 +44,7 @@ class TypeEditorWindow(JDialog):
     callback into the calling class when the type is saved
     """
 
-    def __init__(self, burp_callbacks, typedef, callback):
+    def __init__(self, burp_callbacks, typedef, source, callback):
         burp_window = None
         for frame in Frame.getFrames():
             if "Burp Suite" in frame.getName():
@@ -56,9 +56,11 @@ class TypeEditorWindow(JDialog):
         self.setSize(1000, 700)
 
         self._original_typedef = typedef
+        self._type_source = source
+        self._original_json = json.dumps(self._original_typedef, indent=4)
         self._type_editor = burp_callbacks.createTextEditor()
         self._type_editor.setEditable(True)
-        self._type_editor.setText(json.dumps(self._original_typedef, indent=4))
+        self._type_editor.setText(self._original_json)
 
         splitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
         splitPane.setLeftComponent(self._type_editor.getComponent())
@@ -103,11 +105,19 @@ class TypeEditorWindow(JDialog):
         """Callback for the apply button. Validates the definition and calls
         the callback provided when opening the window
         """
+
         try:
-            message_type = json.loads(self._type_editor.getText().tostring())
+            new_json = self._type_editor.getText().tostring()
+            message_type = json.loads(new_json)
+            if self._original_json == new_json and len(message_type) != 0:
+                # Detect if no text was changed, but allow an empty type for
+                # adding empty ones
+                self.exitTypeWindow()
+                return
+
             blackboxprotobuf.validate_typedef(message_type, self._original_typedef)
 
-            self._type_callback(message_type)
+            self._type_callback(message_type, self._type_source)
             self.exitTypeWindow()
 
         except Exception as exc:

@@ -37,6 +37,7 @@ from pkgutil import extend_path
 
 __path__ = extend_path(__path__, __name__)
 
+
 # Hack to fix loading protobuf libraries within Jython. See https://github.com/protocolbuffers/protobuf/issues/7776
 def fix_protobuf():
     import six

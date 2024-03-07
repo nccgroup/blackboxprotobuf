@@ -136,20 +136,12 @@ class TypeDefinitionTab(burp.ITab):
         button.setToolTipText(tooltip)
         return button
 
-    def create_save_callback(self, name):
-        """Generate a callback for when the save button inside an opened type
-        editor window is saved. Saves the type and tells the list to
-        refresh.
-        """
+    def save_callback(self, typedef, name):
+        """Save typedef and update list for a given message name"""
+        if name not in default_config.known_types:
+            self._extension.known_message_model.addElement(name)
 
-        def save_callback(typedef):
-            """Save typedef and update list for a given message name"""
-            if name not in default_config.known_types:
-                self._extension.known_message_model.addElement(name)
-
-            default_config.known_types[name] = typedef
-
-        return save_callback
+        default_config.known_types[name] = typedef
 
     def add_typedef(self):
         type_name = JOptionPane.showInputDialog("Enter new name")
@@ -162,7 +154,7 @@ class TypeDefinitionTab(burp.ITab):
             )
             return
 
-        self._extension.open_typedef_editor({}, self.create_save_callback(type_name))
+        self._extension.open_typedef_editor({}, type_name, self.save_callback)
 
     def edit_typedef(self):
         list_component = self._type_list_component
@@ -173,7 +165,7 @@ class TypeDefinitionTab(burp.ITab):
         message_type = default_config.known_types[type_name]
 
         self._extension.open_typedef_editor(
-            sort_typedef(message_type), self.create_save_callback(type_name)
+            sort_typedef(message_type), type_name, self.save_callback
         )
 
 
