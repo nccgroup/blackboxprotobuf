@@ -408,14 +408,14 @@ def _group_by_number(buf, pos, end, path):
         # We want field numbers as strings everywhere
         field_number = str(field_number)
 
-        path = path[:] + [field_number]
+        field_path = path[:] + [field_number]
 
         if field_number in output_map and output_map[field_number][0] != wire_type:
             # This should never happen
             raise DecoderException(
                 "Field %s has mistmatched wiretypes. Previous: %s Now: %s"
                 % (field_number, output_map[field_number][0], wire_type),
-                path=path,
+                path=field_path,
             )
 
         length = None
@@ -436,14 +436,16 @@ def _group_by_number(buf, pos, end, path):
             wiretypes.START_GROUP,
             wiretypes.END_GROUP,
         ]:
-            raise DecoderException("GROUP wire types not supported", path=path)
+            raise DecoderException("GROUP wire types not supported", path=field_path)
         else:
-            raise DecoderException("Got unknown wire type: %d" % wire_type, path=path)
+            raise DecoderException(
+                "Got unknown wire type: %d" % wire_type, path=field_path
+            )
         if pos + length > end:
             raise DecoderException(
                 "Decoded length for field %s goes over end: %d > %d"
                 % (field_number, pos + length, end),
-                path=path,
+                path=field_path,
             )
 
         field_buf = buf[pos : pos + length]
