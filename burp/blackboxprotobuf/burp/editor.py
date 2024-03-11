@@ -813,8 +813,10 @@ class MessageInfo:
             )
         if message_hash is None:
             # Base it off just the URL and request/response
-            url = self.request_content_info.getUrl().getPath()
-            message_hash = ":".join([url, str(self.is_request)])
+            url = self.request_content_info.getUrl()
+            message_hash = ":".join(
+                [url.getAuthority(), url.getPath(), str(self.is_request)]
+            )
 
         return message_hash
 
