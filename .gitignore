@@ -4,3 +4,7 @@ TODO
 .vagrant
 __pycache__
 *.pyc
+.vscode
+.hypothesis*
+test_payload
+Test_pb2.py
