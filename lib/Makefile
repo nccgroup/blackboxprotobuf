@@ -11,3 +11,10 @@ test_py3:
 	poetry run python -m pytest tests/py_test/
 format:
 	poetry run black --exclude deps/ .
+prepublish:
+	poetry build
+	poetry config repositories.test-pypi https://test.pypi.org/legacy/
+	# poetry config pypi-token.test-pypi TOKEN
+	# poetry publish -r test-pypi
+	# poetry config pypi-token.pypi TOKEN
+	# poetry publish
