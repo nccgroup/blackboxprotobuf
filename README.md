@@ -11,7 +11,7 @@ Blackbox Protobuf is a set of tools for working with encoded Protocol Buffers
 Protobuf is a binary serialization format from Google which can be used as a
 more efficient alternative to formats like JSON or XML. Developers can define
 the message format in a `.proto` file and use the protobuf compiler to
-geneerate message handlers in their language of choice. The protobuf encoding
+generate message handlers in their language of choice. The protobuf encoding
 is binary, and unlike json/xml not human readable or easy to modify by hand.
 The format also takes advantage of both sides having the message definition and
 strips out much of the type information. This is good for efficiency, but
