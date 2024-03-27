@@ -43,6 +43,7 @@ from java.awt.event import ActionListener
 from javax.swing.border import EmptyBorder
 from blackboxprotobuf.burp import user_funcs
 from blackboxprotobuf.burp import typedef_editor
+from blackboxprotobuf.lib import payloads
 from blackboxprotobuf.lib.config import default as default_config
 from blackboxprotobuf.lib.exceptions import (
     BlackboxProtobufException,
@@ -135,7 +136,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             )
 
             success = True
-            self._payload_info.protobuf = protobuf_data
+            self._payload_info.protobuf_data = protobuf_data
             return self._payload_info.generate_http(self._message_info, self._helpers)
 
         except Exception as exc:
@@ -155,7 +156,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 )
 
                 success = True
-                self._payload_info.protobuf = protobuf_data
+                self._payload_info.protobuf_data = protobuf_data
                 return self._payload_info.generate_http(
                     self._message_info, self._helpers
                 )
@@ -227,7 +228,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             # TODO do we want to check typedef? Can switch away and back to restart it if we need to
             if (
                 message_info.message_hash == self._message_info.message_hash
-                and payload_info.protobuf == self._payload_info.protobuf
+                and payload_info.raw_data == self._payload_info.raw_data
             ):
                 # self._callbacks.printOutput(
                 #    "Switched to tab that is still running with the same hash and payload. Not cancelling."
@@ -249,12 +250,32 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
 
         def run():
             try:
-                self._handle_protobuf(
-                    message_info,
-                    payload_info.protobuf,
-                    message_type,
-                    typedef_source,
-                )
+                decoders = payloads.find_decoders(payload_info.raw_data)
+                for decoder in decoders:
+                    try:
+                        protobuf_data, encoding_alg = decoder(payload_info.raw_data)
+                    except BlackboxProtobufException:
+                        continue
+
+                    try:
+                        self._handle_protobuf(
+                            message_info,
+                            protobuf_data,
+                            message_type,
+                            typedef_source,
+                        )
+
+                        # Payload successfully decoded, so we probably have the right wrapper for the payload
+                        self._payload_info.protobuf_data = protobuf_data
+                        self._payload_info.encoding_alg = encoding_alg
+
+                        return
+                    except BlackboxProtobufException:
+                        if encoding_alg == "none":
+                            # Reraise the exception to the parent context and halt decoding
+                            six.reraise(*sys.exc_info())
+                        continue
+
             except Exception as ex:
                 # Catch all, otherwise it disappears
                 self._text_editor.setText("Error decoding protobuf")
@@ -387,7 +408,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
             # If it works, save the message
             # Don't need to save typeddef because we're using the one from lastgood
             self._last_good.message = json_data
-            self._payload_info.protobuf = protobuf_data
+            self._payload_info.protobuf_data = protobuf_data
 
         except Exception as exc:
             JOptionPane.showMessageDialog(
@@ -499,7 +520,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         json_data = self._text_editor.getText().tostring()
 
         protobuf_data = blackboxprotobuf.protobuf_from_json(json_data, old_typedef)
-        self._payload_info.protobuf = protobuf_data
+        self._payload_info.protobuf_data = protobuf_data
 
         new_json, new_typedef = blackboxprotobuf.protobuf_to_json(
             str(protobuf_data), typedef
@@ -825,13 +846,16 @@ class PayloadInfo:
     """This class stores the latest payload data and functions to transform it to or from a HTTP message"""
 
     def __init__(self, message_info, helpers):
-        self.protobuf = None
+        self.raw_data = None  # Raw data from payload
+        # These attributes must be set from outside this payload
+        self.encoding_alg = None
+        self.protobuf_data = None  # last known good encoded protobuf payload
         self.parse_http(message_info, helpers)
 
     def parse_http(self, message_info, helpers):
-        protobuf_data = None
+        raw_data = None
         if "get_protobuf_data" in dir(user_funcs):
-            protobuf_data = user_funcs.get_protobuf_data(
+            raw_data = user_funcs.get_protobuf_data(
                 message_info.content(),
                 message_info.is_request,
                 message_info.content_info(),
@@ -839,20 +863,16 @@ class PayloadInfo:
                 message_info.request,
                 message_info.request_content_info,
             )
-        if protobuf_data is None:
-            protobuf_data = message_info.content()[
+        if raw_data is None:
+            raw_data = message_info.content()[
                 message_info.content_info().getBodyOffset() :
             ].tostring()
-
-        encoder, protobuf = self._decode_payload(protobuf_data)
-        self.encoder = encoder
-        self.protobuf = protobuf
+        self.raw_data = raw_data
 
     def generate_http(self, message_info, helpers):
-        protobuf_data = self._encode_payload()
         if "set_protobuf_data" in dir(user_funcs):
             result = user_funcs.set_protobuf_data(
-                protobuf_data,
+                self.protobuf_data,
                 message_info.content(),
                 message_info.is_request,
                 message_info.content_info(),
@@ -863,37 +883,13 @@ class PayloadInfo:
             if result is not None:
                 return result
 
+        if self.protobuf_data is None:
+            raise BlackboxProtobufException(
+                "Error generating HTTP body. PayloadInfo does not have valid protobuf data to encode"
+            )
+        raw_data = payloads.encode_payload(self.protobuf_data, self.encoding_alg)
         headers = message_info.content_info().getHeaders()
-        return helpers.buildHttpMessage(headers, str(protobuf_data))
-
-    def _decode_payload(self, payload):
-        if payload.startswith(bytearray([0x1F, 0x8B, 0x08])):
-            gzip_decompress = zlib.decompressobj(-zlib.MAX_WBITS)
-            return "gzip", gzip_decompress.decompress(payload)
-
-        # try decoding as a gRPC payload: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
-        # we're naiively handling only uncompressed payloads
-        if len(payload) > 1 + 4 and payload.startswith(
-            bytearray([0x00])
-        ):  # gRPC has 1 byte flag + 4 byte length
-            (message_length,) = struct.unpack_from(">I", payload[1:])
-            if len(payload) == 1 + 4 + message_length:
-                return "gRPC", payload[1 + 4 :]
-
-        # TODO would like to handle base64 for and websafe base64 here
-        return None, payload
-
-    def _encode_payload(self):
-        """Reverse decoding that we did before, either"""
-        payload = self.protobuf
-        if self.encoder == "gzip":
-            gzip_compress = zlib.compressobj(-1, zlib.DEFLATED, -zlib.MAX_WBITS)
-            return gzip_compress.compress(payload)
-        elif self.encoder == "gRPC":
-            message_length = struct.pack(">I", len(payload))
-            return bytearray([0x00]) + bytearray(message_length) + payload
-        else:
-            return payload
+        return helpers.buildHttpMessage(headers, str(raw_data))
 
 
 class LastGoodData:
