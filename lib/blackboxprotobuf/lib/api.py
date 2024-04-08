@@ -108,6 +108,12 @@ def encode_message(value, message_type, config=None):
 
     if config is None:
         config = blackboxprotobuf.lib.config.default
+    
+    if message_type is None or isinstance(message_type, str):
+        if message_type not in config.known_types:
+            message_type = {}
+        else:
+            message_type = config.known_types[message_type]
     return bytes(
         blackboxprotobuf.lib.types.length_delim.encode_message(
             value, config, message_type
@@ -644,6 +650,8 @@ def _annotate_typedef(typedef, message):
 
 
 def _strip_typedef_annotations(typedef):
+    if not isinstance(typedef, dict):
+        return
     # Remove example values placed by _annotate_typedef
     for _, field_def in typedef.items():
         if "example_value_ignored" in field_def:
