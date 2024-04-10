@@ -445,7 +445,7 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
     # figure out packed
     # default based on repeated + proto3, fallback to options
     field_options = match.group(5)
-    is_packed = is_repeated and is_proto3 and (field_type in PACKABLE_TYPES)
+    is_packed = is_repeated and is_proto3 and (bbp_type in PACKABLE_TYPES)
     if is_packed and field_options and "packed=false" in field_options:
         is_packed = False
     elif is_repeated and field_options and "packed=true" in field_options:
