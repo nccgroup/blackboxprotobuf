@@ -8,3 +8,5 @@ __pycache__
 .hypothesis*
 test_payload
 Test_pb2.py
+Test_pb2_grpc.py
+*.pem
