@@ -59,6 +59,9 @@ It can be installed with:
 pip install bbpb
 ```
 
+## CLI
+For command line usage see [CLI.md](./CLI.md).
+
 ## Interface
 The main `blackboxprotobuf` module defines an API with the core encode/decode
 message functions, along with several convenience functions to make it easier
