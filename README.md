@@ -11,7 +11,7 @@ Blackbox Protobuf is a set of tools for working with encoded Protocol Buffers
 Protobuf is a binary serialization format from Google which can be used as a
 more efficient alternative to formats like JSON or XML. Developers can define
 the message format in a `.proto` file and use the protobuf compiler to
-geneerate message handlers in their language of choice. The protobuf encoding
+generate message handlers in their language of choice. The protobuf encoding
 is binary, and unlike json/xml not human readable or easy to modify by hand.
 The format also takes advantage of both sides having the message definition and
 strips out much of the type information. This is good for efficiency, but
@@ -28,11 +28,11 @@ This repository contains two applications for working with protocol buffers:
 
 - A jython burp extension in [burp/](https://github.com/nccgroup/blackboxprotobuf/tree/master/burp)
 - A python library that can be used in other applications in [lib/](https://github.com/nccgroup/blackboxprotobuf/tree/master/lib)
+- A python-based CLI embedded in the [library](https://github.com/nccgroup/blackboxprotobuf/tree/master/lib/CLI.md)
+- A mitmproxy addon in [mitmproxy](https://github.com/nccgroup/blackboxprotobuf/tree/master/mitmproxy)
 
 ## Future Tools
 
 Some tooling that may be built on top of blackboxprotobuf in the future:
 
-- mitmproxy addon
-- command line interface
 - protobuf type discovery tool
