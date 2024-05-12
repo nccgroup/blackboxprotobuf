@@ -4,7 +4,7 @@ Grouped into submodules based on wire type.
 Re-exports type_maps items for easier access.
 """
 
-# Copyright (c) 2018-2023 NCC Group Plc
+# Copyright (c) 2018-2024 NCC Group Plc
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
