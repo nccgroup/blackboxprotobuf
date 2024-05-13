@@ -77,7 +77,9 @@ def decode_message(buf, message_type=None, config=None):
     if isinstance(buf, bytearray):
         buf = bytes(buf)
     buf = six.ensure_binary(buf)
-    if message_type is None or isinstance(message_type, str):
+    if message_type is None:
+        message_type = {}
+    elif isinstance(message_type, str):
         if message_type not in config.known_types:
             message_type = {}
         else:
