@@ -180,7 +180,7 @@ replaces some variables that were global before.
 At the moment this includes:
 
 * `known_types` - Mapping of message type names to typedef (previously
-  `blackboxprotobuf.known_messages)
+  `blackboxprotobuf.known_messages`)
 
 * `default_binary_type` - Change the default type choice for binary fields when
   decoding previously unknown fields. Defaults to `bytes` but can be set to
@@ -230,7 +230,7 @@ This is used for strings, bytestrings, inner messages and packed repeated
 fields. Messages can generally be identified by validating if it is a valid
 protobuf binary. If it is not a message, the default type is a string/byte
 which are relatively interchangeable in Python. A different default type (such
-as `bytes_hex` can be specified by changing
+as `bytes_hex`) can be specified by changing
 `blackboxprotobuf.lib.types.default_binary_type`.
 
 Packed repeated fields are arrays of either `varints` or a fixed length wire
