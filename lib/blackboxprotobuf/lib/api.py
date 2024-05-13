@@ -108,6 +108,20 @@ def encode_message(value, message_type, config=None):
 
     if config is None:
         config = blackboxprotobuf.lib.config.default
+
+    if message_type is None:
+        raise EncoderException(
+            "Encode message must have valid type definition. message_type cannot be None"
+        )
+
+    if isinstance(message_type, str):
+        if message_type not in config.known_types:
+            raise EncoderException(
+                "The provided message type name (%s) is not known. Encoding requires a valid type definition"
+                % message_type
+            )
+        message_type = config.known_types[message_type]
+
     return bytes(
         blackboxprotobuf.lib.types.length_delim.encode_message(
             value, config, message_type
