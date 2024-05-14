@@ -20,12 +20,25 @@
 
 from .types import type_maps
 
+import six
+from blackboxprotobuf.lib.exceptions import (
+    DecoderException,
+)
+
+if six.PY3:
+    import typing
+
+    if typing.TYPE_CHECKING:
+        from typing import Dict
+        from .pytypes import TypeDef
+
 
 class Config:
     def __init__(self):
+        # type: (Config) -> None
         # Map of message type names to typedefs, previously stored at
         # `blackboxprotobuf.known_messages`
-        self.known_types = {}
+        self.known_types = {}  # type: Dict[str, TypeDef]
 
         # Default type for "bytes" like objects that aren't messages or strings
         # Other option is currently just 'bytes_hex'
@@ -33,7 +46,7 @@ class Config:
 
         # Change the default type for a wiretype (eg. change ints to be signed
         # by default or fixed fields to always be float)
-        self.default_types = {}
+        self.default_types = {}  # type: Dict[int, str]
 
         # Configure whether bbpb should try to re-encode fields in the same
         # order they decoded
@@ -43,10 +56,15 @@ class Config:
         self.preserve_field_order = True
 
     def get_default_type(self, wiretype):
+        # type: (Config, int) -> str
         default_type = self.default_types.get(wiretype, None)
         if default_type is None:
             default_type = type_maps.WIRE_TYPE_DEFAULTS.get(wiretype, None)
 
+        if default_type is None:
+            raise DecoderException(
+                "Could not find default type for wire type %d" % wiretype
+            )
         return default_type
 
 

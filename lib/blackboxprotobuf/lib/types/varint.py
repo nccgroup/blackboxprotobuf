@@ -26,6 +26,9 @@ import six
 
 from blackboxprotobuf.lib.exceptions import EncoderException, DecoderException
 
+if six.PY3:
+    from typing import Any, Tuple
+
 # These are set in decoder.py
 # In theory, uvarints and zigzag varints shouldn't have a max
 # But this is enforced by protobuf
@@ -36,7 +39,10 @@ MIN_SVARINT = -(1 << 63)
 
 
 def encode_uvarint(value):
+    # type: (Any) -> bytes
     """Encode a long or int into a bytearray."""
+    if not isinstance(value, six.integer_types):
+        raise EncoderException("Got non-int type for uvarint encoding: %s" % value)
     output = bytearray()
     if value < MIN_UVARINT:
         raise EncoderException(
@@ -62,6 +68,7 @@ def encode_uvarint(value):
 
 
 def decode_uvarint(buf, pos):
+    # type: (bytes, int) -> Tuple[int, int]
     """Decode bytearray into a long."""
     pos_start = pos
     # Convert buffer to string
@@ -92,7 +99,7 @@ def decode_uvarint(buf, pos):
         )
     if buf[pos_start:pos] != test_encode:
         raise DecoderException(
-            "Error decoding uvarint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
+            "Error decoding uvarint: Encoding is not standard:\noriginal:  %r\nstandard: %r"
             % (buf[pos_start:pos], test_encode)
         )
 
@@ -100,7 +107,10 @@ def decode_uvarint(buf, pos):
 
 
 def encode_varint(value):
+    # type: (Any) -> bytes
     """Encode a long or int into a bytearray."""
+    if not isinstance(value, six.integer_types):
+        raise EncoderException("Got non-int type for varint encoding: %s" % value)
     if value > MAX_SVARINT:
         raise EncoderException(
             "Error encoding %d as varint. Value must be <= %s" % (value, MAX_SVARINT)
@@ -116,6 +126,7 @@ def encode_varint(value):
 
 
 def decode_varint(buf, pos):
+    # type: (bytes, int) -> Tuple[int, int]
     """Decode bytearray into a long."""
     # Convert buffer to string
     pos_start = pos
@@ -137,19 +148,21 @@ def decode_varint(buf, pos):
 
     if buf[pos_start:pos] != test_encode:
         raise DecoderException(
-            "Error decoding varint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
+            "Error decoding varint: Encoding is not standard:\noriginal:  %r\nstandard: %r"
             % (buf[pos_start:pos], test_encode)
         )
     return (value, pos)
 
 
 def encode_zig_zag(value):
+    # type: (int) -> int
     if value < 0:
         return (abs(value) << 1) - 1
     return value << 1
 
 
 def decode_zig_zag(value):
+    # type: (int) -> int
     if value & 0x1:
         # negative
         return -((value + 1) >> 1)
@@ -157,7 +170,10 @@ def decode_zig_zag(value):
 
 
 def encode_svarint(value):
+    # type: (Any) -> bytes
     """Zigzag encode the potentially signed value prior to encoding"""
+    if not isinstance(value, six.integer_types):
+        raise EncoderException("Got non-int type for svarint encoding: %s" % value)
     # zigzag encode value
     if value > MAX_SVARINT:
         raise EncoderException(
@@ -171,6 +187,7 @@ def encode_svarint(value):
 
 
 def decode_svarint(buf, pos):
+    # type: (bytes, int) -> Tuple[int, int]
     """Decode bytearray into a long."""
     pos_start = pos
 
@@ -181,7 +198,7 @@ def decode_svarint(buf, pos):
     test_encode = encode_svarint(value)
     if buf[pos_start:pos] != test_encode:
         raise DecoderException(
-            "Error decoding svarint: Encoding is not standard:\noriginal:  %s\nstandard: %s"
+            "Error decoding svarint: Encoding is not standard:\noriginal:  %r\nstandard: %r"
             % (buf[pos_start:pos], test_encode)
         )
 

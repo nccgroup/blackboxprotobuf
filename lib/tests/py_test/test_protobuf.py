@@ -46,21 +46,21 @@ except:
     import Test_pb2
 
 testMessage_typedef = {
-    "1": {"type": "double", "name": "testDouble"},
-    "2": {"type": "float", "name": "testFloat"},
+    "1": {"type": "double", "name": six.u("testDouble")},
+    "2": {"type": "float", "name": six.u("testFloat")},
     # "4": {"type": "int", "name": "testInt32"},
-    "8": {"type": "int", "name": "testInt64"},
+    "8": {"type": "int", "name": six.u("testInt64")},
     # "16": {"type": "uint", "name": "testUInt32"},
-    "32": {"type": "uint", "name": "testUInt64"},
+    "32": {"type": "uint", "name": six.u("testUInt64")},
     # "64": {"type": "sint", "name": "testSInt32"},
-    "128": {"type": "sint", "name": "testSInt64"},
-    "256": {"type": "fixed32", "name": "testFixed32"},
-    "512": {"type": "fixed64", "name": "testFixed64"},
-    "1024": {"type": "sfixed32", "name": "testSFixed32"},
-    "2048": {"type": "sfixed64", "name": "testSFixed64"},
+    "128": {"type": "sint", "name": six.u("testSInt64")},
+    "256": {"type": "fixed32", "name": six.u("testFixed32")},
+    "512": {"type": "fixed64", "name": six.u("testFixed64")},
+    "1024": {"type": "sfixed32", "name": six.u("testSFixed32")},
+    "2048": {"type": "sfixed64", "name": six.u("testSFixed64")},
     # "4096": {"type": "int", "name": "testBool"},
-    "8192": {"type": "string", "name": "testString"},
-    "16384": {"type": "bytes", "name": "testBytes"},
+    "8192": {"type": "string", "name": six.u("testString")},
+    "16384": {"type": "bytes", "name": six.u("testBytes")},
     # "32768": {"type": "message", "name": "testEmbed",
     #          "message_typedef": {
     #                "3": {"type": "double", "name": "embedDouble"},
@@ -113,9 +113,7 @@ def test_modify(x, modify_num):
     # eliminate any cases where protobuf defaults out a field
     hypothesis.assume(modify_key in decoded)
 
-    if isinstance(decoded[modify_key], str):
-        mod_func = lambda x: "test"
-    elif six.PY2 and isinstance(decoded[modify_key], unicode):
+    if isinstance(decoded[modify_key], six.text_type):
         mod_func = lambda x: six.u("test")
     elif isinstance(decoded[modify_key], bytes):
         mod_func = lambda x: b"test"
@@ -222,9 +220,7 @@ def test_modify_json(x, modify_num):
     # eliminate any cases where protobuf defaults out a field
     hypothesis.assume(modify_key in decoded)
 
-    if isinstance(decoded[modify_key], str):
-        mod_func = lambda x: "test"
-    elif six.PY2 and isinstance(decoded[modify_key], unicode):
+    if isinstance(decoded[modify_key], six.text_type):
         mod_func = lambda x: six.u("test")
     elif isinstance(decoded[modify_key], bytes):
         mod_func = lambda x: b"test"

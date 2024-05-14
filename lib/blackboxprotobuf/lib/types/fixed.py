@@ -25,9 +25,15 @@ import binascii
 import six
 from blackboxprotobuf.lib.exceptions import DecoderException, EncoderException
 
+import six
+
+if six.PY3:
+    from typing import Any, Tuple
+
 
 # Generic functions for encoding/decoding structs based on the "struct" format
 def encode_struct(fmt, value):
+    # type: (str, Any) -> bytes
     """Generic method for encoding arbitrary python "struct" values"""
     try:
         return struct.pack(fmt, value)
@@ -41,6 +47,7 @@ def encode_struct(fmt, value):
 
 
 def decode_struct(fmt, buf, pos):
+    # type: (str, bytes, int) -> Tuple[Any, int]
     """Generic method for decoding arbitrary python "struct" values"""
     new_pos = pos + struct.calcsize(fmt)
     try:
@@ -48,7 +55,7 @@ def decode_struct(fmt, buf, pos):
     except struct.error as exc:
         six.raise_from(
             DecoderException(
-                "Error deocding format string %s from bytes: %s"
+                "Error deocding format string %s from bytes: %r"
                 % (fmt, binascii.hexlify(buf[pos:new_pos]))
             ),
             exc,
@@ -57,13 +64,19 @@ def decode_struct(fmt, buf, pos):
 
 _fixed32_fmt = "<I"
 
+# Note on types: We use Any here for decoded objects. While we could manually
+# enforce individual types, we would have to do so via `typing.cast` anyway
+# because of `struct`. The Message type also has `Any` anyways.
+
 
 def encode_fixed32(value):
+    # type: (Any) -> bytes
     """Encode a single 32 bit fixed-size value"""
     return encode_struct(_fixed32_fmt, value)
 
 
 def decode_fixed32(buf, pos):
+    # type: (bytes, int) -> Tuple[Any, int]
     """Decode a single 32 bit fixed-size value"""
     return decode_struct(_fixed32_fmt, buf, pos)
 
@@ -72,11 +85,13 @@ _sfixed32_fmt = "<i"
 
 
 def encode_sfixed32(value):
+    # type: (Any) -> bytes
     """Encode a single signed 32 bit fixed-size value"""
     return encode_struct(_sfixed32_fmt, value)
 
 
 def decode_sfixed32(buf, pos):
+    # type: (bytes, int) -> Tuple[Any, int]
     """Decode a single signed 32 bit fixed-size value"""
     return decode_struct(_sfixed32_fmt, buf, pos)
 
@@ -85,11 +100,13 @@ _float_fmt = "<f"
 
 
 def encode_float(value):
+    # type: (Any) -> bytes
     """Encode a single 32 bit floating point value"""
     return encode_struct(_float_fmt, value)
 
 
 def decode_float(buf, pos):
+    # type: (bytes, int) -> Tuple[Any, int]
     """Decode a single 32 bit floating point value"""
     return decode_struct(_float_fmt, buf, pos)
 
@@ -98,11 +115,13 @@ _fixed64_fmt = "<Q"
 
 
 def encode_fixed64(value):
+    # type: (Any) -> bytes
     """Encode a single 64 bit fixed-size value"""
     return encode_struct(_fixed64_fmt, value)
 
 
 def decode_fixed64(buf, pos):
+    # type: (bytes, int) -> Tuple[Any, int]
     """Decode a single 64 bit fixed-size value"""
     return decode_struct(_fixed64_fmt, buf, pos)
 
@@ -111,11 +130,13 @@ _sfixed64_fmt = "<q"
 
 
 def encode_sfixed64(value):
+    # type: (Any) -> bytes
     """Encode a single signed 64 bit fixed-size value"""
     return encode_struct(_sfixed64_fmt, value)
 
 
 def decode_sfixed64(buf, pos):
+    # type: (bytes, int) -> Tuple[Any, int]
     """Decode a single signed 64 bit fixed-size value"""
     return decode_struct(_sfixed64_fmt, buf, pos)
 
@@ -124,10 +145,12 @@ _double_fmt = "<d"
 
 
 def encode_double(value):
+    # type: (Any) -> bytes
     """Encode a single 64 bit floating point value"""
     return encode_struct(_double_fmt, value)
 
 
 def decode_double(buf, pos):
+    # type: (bytes, int) -> Tuple[Any, int]
     """Decode a single 64 bit floating point value"""
     return decode_struct(_double_fmt, buf, pos)

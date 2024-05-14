@@ -18,6 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import six
 import binascii
 import hypothesis.strategies as st
 import blackboxprotobuf
@@ -74,7 +75,7 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
         message_types = types
 
     for field_number, field_name in zip(field_numbers, field_names):
-        field_number = str(field_number)
+        field_number = six.ensure_text(str(field_number))
         if max_depth == 0 and "message" in message_types:
             message_types.remove("message")
         field_type = draw(st.sampled_from(message_types))
@@ -102,7 +103,7 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
 
         # decide whether to give it a name
         if named_fields and not anon and draw(st.booleans()):
-            output[field_number]["name"] = field_name
+            output[field_number]["name"] = six.ensure_text(field_name)
 
     return output
 
@@ -114,7 +115,7 @@ def gen_message_data(draw, type_def):
         if "name" in field and field["name"] != "":
             field_label = field["name"]
         else:
-            field_label = str(number)
+            field_label = six.ensure_text(str(number))
 
         field_type = field["type"]
         if field_type == "message":

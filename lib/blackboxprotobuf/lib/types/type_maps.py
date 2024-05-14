@@ -24,6 +24,11 @@ functions, wiretypes and default types
 
 from blackboxprotobuf.lib.types import varint, fixed, length_delim, wiretypes
 
+import six
+
+if six.PY3:
+    from typing import Any, Callable, Dict, Tuple
+
 # Map a blackboxprotobuf type to specific encoder
 ENCODERS = {
     "uint": varint.encode_uvarint,
@@ -47,7 +52,7 @@ ENCODERS = {
     "packed_fixed64": length_delim.generate_packed_encoder(fixed.encode_fixed64),
     "packed_sfixed64": length_delim.generate_packed_encoder(fixed.encode_sfixed64),
     "packed_double": length_delim.generate_packed_encoder(fixed.encode_double),
-}
+}  # type: Dict[str, Callable[[Any], bytes]]
 
 # Map a blackboxprotobuf type to specific decoder
 DECODERS = {
@@ -72,7 +77,7 @@ DECODERS = {
     "packed_fixed64": length_delim.generate_packed_decoder(fixed.decode_fixed64),
     "packed_sfixed64": length_delim.generate_packed_decoder(fixed.decode_sfixed64),
     "packed_double": length_delim.generate_packed_decoder(fixed.decode_double),
-}
+}  # type: Dict[str, Callable[[bytes, int], Tuple[Any, int]  ]]
 
 WIRETYPES = {
     "uint": wiretypes.VARINT,
@@ -98,7 +103,7 @@ WIRETYPES = {
     "packed_fixed64": wiretypes.LENGTH_DELIMITED,
     "packed_sfixed64": wiretypes.LENGTH_DELIMITED,
     "packed_double": wiretypes.LENGTH_DELIMITED,
-}
+}  # type: Dict[str, int]
 
 # Default values to use when decoding each wire type
 # length delimited is special and handled in the length_delim module
@@ -109,4 +114,4 @@ WIRE_TYPE_DEFAULTS = {
     wiretypes.LENGTH_DELIMITED: None,
     wiretypes.START_GROUP: None,
     wiretypes.END_GROUP: None,
-}
+}  # type: Dict[int, str | None]

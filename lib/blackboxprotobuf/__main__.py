@@ -24,12 +24,17 @@ import base64
 import logging
 import argparse
 
+import typing
+from typing import Any, Dict, Optional, Tuple
+
 from .lib.exceptions import BlackboxProtobufException
 from .lib import api
 from .lib import payloads
+from .lib.pytypes import TypeDef, Message
 
 
 def main():
+    # type: () -> int
     parser = argparse.ArgumentParser(description="Decode/Encode Protobuf Messages")
     parser.add_argument(
         "-e",
@@ -75,7 +80,9 @@ def main():
 
     args = parser.parse_args()
 
-    message, typedef, payload_encoding = None, None, None
+    message = None  # type:  str | bytes | Message | None
+    typedef = None  # type: TypeDef | None
+    payload_encoding = None  # type: str | None
 
     if args.input_type:
         typedef, payload_encoding = _read_input_typedef_arg(args)
@@ -102,28 +109,39 @@ def main():
 
     # Start basic, raw protobuf decoding
     if args.encode:
+        if not isinstance(message, dict):
+            sys.stderr.write("Error did not get a valid message to encode")
+            return 1
+        if typedef is None:
+            sys.stderr.write("Encoding requires a valid type definition")
+            return 1
         return _encode(args, message, typedef, payload_encoding)
     else:
+        if isinstance(message, str):
+            message = message.encode("utf-8")
+        if not isinstance(message, bytes):
+            sys.stderr.write("Error did not get a valid message to decode")
+            return 1
         return _decode(args, message, typedef, payload_encoding)
 
 
 # Reads input from the location from args
 # Does not handle any JSON decoding
 def _read_input(args):
+    # type: (argparse.Namespace) -> str | bytes
     if args.encode or args.json_protobuf:
         # Text
-        data = sys.stdin.read()
+        return sys.stdin.read()
     else:
         # Binary
-        data = sys.stdin.buffer.read()
-
-    return data
+        return sys.stdin.buffer.read()
 
 
 # Writes output to the location from args
 # Does not handle any JSON encoding
 def _write_output(args, data):
-    if not args.encode or args.json_protobuf:
+    # type: (argparse.Namespace, str | bytes) -> None
+    if isinstance(data, str):
         # Text
         sys.stdout.write(data)
     else:
@@ -132,6 +150,7 @@ def _write_output(args, data):
 
 
 def _read_input_typedef_arg(args):
+    # type: (argparse.Namespace) -> Tuple[TypeDef, Optional[str]]
     with open(args.input_type, "r") as f:
         input_json = json.load(f)
     if "typedef" in input_json:
@@ -142,11 +161,13 @@ def _read_input_typedef_arg(args):
 
 
 def _write_output_typedef_arg(args, typedef):
+    # type: (argparse.Namespace, Dict[str, str | TypeDef]) -> None
     with open(args.output_type, "w") as f:
         f.write(_to_json(args, typedef))
 
 
 def _to_json(args, data):
+    # type: (argparse.Namespace, Dict[str, Any]) -> str
     if args.compact:
         return json.dumps(data)
     else:
@@ -154,46 +175,58 @@ def _to_json(args, data):
 
 
 def _read_input_json_encoding(args, input_json, typedef, payload_encoding):
+    # type: (argparse.Namespace, Message | Dict[str, str | Message | TypeDef], Optional[TypeDef], Optional[str]) -> Tuple[Message, Optional[TypeDef], Optional[str]]
     if typedef is None and "typedef" not in input_json:
         sys.stderr.write(
             "Error: Did not get a typedef from --input-type or stdin. A typedef is required for encoding\n"
         )
         sys.exit(1)
 
-    message = input_json.get("message")
+    message = typing.cast(Message | None, input_json.get("message"))
     if message is None:
         # Whole input is message. We already checked to make sure we have a typedef, so we can ditch it
-        return input_json, typedef, None
+        return typing.cast(Message, input_json), typedef, None
 
     if typedef is None:
-        typedef = input_json.get("typedef")
+        typedef = typing.cast(TypeDef | None, input_json.get("typedef"))
 
     if payload_encoding is None:
-        payload_encoding = input_json.get("payload_encoding")
+        json_payload_encoding = input_json.get("payload_encoding")
+        if isinstance(json_payload_encoding, str):
+            payload_encoding = json_payload_encoding
+        elif json_payload_encoding is None:
+            payload_encoding = None
+        else:
+            sys.stderr.write(
+                "Warn: Payload encoding must be a string value: %r" % payload_encoding
+            )
+            payload_encoding = None
 
     return message, typedef, payload_encoding
 
 
 def _read_input_json_decoding(args, input_json, typedef, payload_encoding):
+    # type: (argparse.Namespace, Dict[str, TypeDef | str], Optional[TypeDef], Optional[str]) -> Tuple[bytes, Optional[TypeDef], Optional[str]]
     # Return message, typedef, payload_encoding
-    message = input_json.get("protobuf_data")
+    message = typing.cast(str | None, input_json.get("protobuf_data"))
     if message is None:
         sys.stderr.write('Error: Did not get a "protobuf_data" attribute in input JSON')
         sys.exit(1)
 
     if typedef is None:
-        typedef = input_json.get("typedef")
+        typedef = typing.cast(TypeDef | None, input_json.get("typedef"))
 
     if payload_encoding is None:
-        payload_encoding = input_json.get("payload_encoding")
+        payload_encoding = typing.cast(str | None, input_json.get("payload_encoding"))
 
     # base64 decode if protobuf_json when decoding
-    message = base64.b64decode(message)
+    protobuf_data = base64.b64decode(message)
 
-    return message, typedef, payload_encoding
+    return protobuf_data, typedef, payload_encoding
 
 
-def _encode(args, data, typedef, payload_encoding):
+def _encode(args, message, typedef, payload_encoding):
+    # type: (argparse.Namespace, Message, TypeDef, Optional[str]) -> int
     if typedef is None:
         sys.stderr.write("Error: Cannot encode without a valid typedef")
         return 1
@@ -202,26 +235,29 @@ def _encode(args, data, typedef, payload_encoding):
         payload_encoding = "none"
 
     # Re jsonify so that bbpb can fix bytes
-    message_json = json.dumps(data)
+    message_json = json.dumps(message)
 
     protobuf_data = api.protobuf_from_json(message_json, typedef)
 
     data = payloads.encode_payload(protobuf_data, payload_encoding)
 
     if args.json_protobuf:
-        data = {
+        json_out = {
             "protobuf_data": base64.b64encode(data).decode("ascii"),
             "typedef": typedef,  # Typedef is a bit redundant here
         }
         if payload_encoding != "none":
-            data["payload_encoding"] = payload_encoding
-        data = _to_json(args, data)
-    _write_output(args, data)
+            json_out["payload_encoding"] = payload_encoding
+
+        _write_output(args, _to_json(args, json_out))
+    else:
+        _write_output(args, data)
     return 0
 
 
-def _decode(args, message, typedef, payload_encoding):
-    if len(message) == 0:
+def _decode(args, data, typedef, payload_encoding):
+    # type: (argparse.Namespace, bytes, Optional[TypeDef], str) -> int
+    if len(data) == 0:
         sys.stderr.write("Error: Input data cannot be empty\n")
         return 1
 
@@ -230,16 +266,16 @@ def _decode(args, message, typedef, payload_encoding):
     if payload_encoding:
         # Use provided payload encoding algorithm
         protobuf_data, payload_encoding = payloads.decode_payload(
-            message, payload_encoding
+            data, payload_encoding
         )
         message_json, output_typedef = api.protobuf_to_json(protobuf_data, typedef)
     else:
         # Have to guess the decoding algorithm
-        decoders = payloads.find_decoders(message)
+        decoders = payloads.find_decoders(data)
 
         for decode in decoders:
             try:
-                protobuf_data, encoding_alg = decode(message)
+                protobuf_data, encoding_alg = decode(data)
             except BlackboxProtobufException:
                 # The "none" algorithm should always succeed
                 continue
@@ -256,9 +292,8 @@ def _decode(args, message, typedef, payload_encoding):
     message = json.loads(message_json)
 
     if args.output_type:
-        output_typedef_data = {
-            "typedef": output_typedef,
-        }
+        output_typedef_data = {}  # type: Dict[str, TypeDef | str]
+        output_typedef_data["typedef"] = output_typedef
         if payload_encoding != "none":
             output_typedef_data["payload_encoding"] = payload_encoding
         _write_output_typedef_arg(args, output_typedef_data)

@@ -22,8 +22,12 @@
     protobuf data, such as compression and grpc header. """
 
 from blackboxprotobuf.lib.exceptions import BlackboxProtobufException
-
 from . import gzip, grpc
+
+import six
+
+if six.PY3:
+    from typing import List, Callable, Tuple, Optional
 
 
 # Returns an ordered list of potential decoders, from most specific to least specific
@@ -31,9 +35,10 @@ from . import gzip, grpc
 # to decode as a protobuf. This should minimize the chance of a false positive
 # on any decoders
 def find_decoders(buf):
+    # type: (bytes) -> List[Callable[[bytes], Tuple[bytes, str]]]
     # In the future, we can take into account content-type too, such as for
     # grpc, but we risk false negatives
-    decoders = []
+    decoders = []  # type: List[Callable[[bytes], Tuple[bytes, str]]]
 
     if gzip.is_gzip(buf):
         decoders.append(gzip.decode_gzip)
@@ -46,11 +51,13 @@ def find_decoders(buf):
 
 
 def _none_decoder(buf):
+    # type: (bytes) -> Tuple[bytes, str]
     return buf, "none"
 
 
 # Decoder by name
 def decode_payload(buf, decoder):
+    # type: (bytes, Optional[str]) -> Tuple[bytes, str]
     if decoder is None:
         return buf, "none"
     decoder = decoder.lower()
@@ -66,6 +73,7 @@ def decode_payload(buf, decoder):
 
 # Encode by name, should pass in the results from the decode function
 def encode_payload(buf, encoder):
+    # type: (bytes, Optional[str]) -> bytes
     if encoder is None:
         return buf
     encoder = encoder.lower()

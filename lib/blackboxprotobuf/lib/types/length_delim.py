@@ -26,6 +26,7 @@ import sys
 import six
 import logging
 
+
 import blackboxprotobuf.lib
 from blackboxprotobuf.lib.types import varint, wiretypes
 from blackboxprotobuf.lib.exceptions import (
@@ -34,8 +35,17 @@ from blackboxprotobuf.lib.exceptions import (
     TypedefException,
 )
 
+if six.PY3:
+    import typing
+
+    if typing.TYPE_CHECKING:
+        from blackboxprotobuf.lib.config import Config
+        from typing import Any, Callable, Dict, Tuple, Optional, List
+        from blackboxprotobuf.lib.pytypes import Message, TypeDef, FieldDef
+
 
 def encode_string(value):
+    # type: (Any) -> bytes
     """Encode a string as a length delimited byte array"""
     try:
         value = six.ensure_text(value)
@@ -47,6 +57,7 @@ def encode_string(value):
 
 
 def encode_bytes(value):
+    # type: (Any) -> bytes
     """Encode a length delimited byte array"""
     if isinstance(value, bytearray):
         value = bytes(value)
@@ -56,11 +67,18 @@ def encode_bytes(value):
         six.raise_from(
             EncoderException("Error encoding bytes to message: %r" % value), exc
         )
+
+    if not isinstance(value, bytes):
+        raise EncoderException(
+            "encode_bytes must receive a bytes or bytearray value: %s %r"
+            % (type(value), value)
+        )
     encoded_length = varint.encode_varint(len(value))
     return encoded_length + value
 
 
 def decode_bytes(buf, pos):
+    # type: (bytes, int) -> Tuple[bytes, int]
     """Decode a length delimited bytes array from buf"""
     length, pos = varint.decode_varint(buf, pos)
     end = pos + length
@@ -80,6 +98,7 @@ def decode_bytes(buf, pos):
 
 
 def encode_bytes_hex(value):
+    # type: (Any) -> bytes
     """Encode a length delimited byte array represented by a hex string"""
     try:
         return encode_bytes(binascii.unhexlify(value))
@@ -90,12 +109,14 @@ def encode_bytes_hex(value):
 
 
 def decode_bytes_hex(buf, pos):
+    # type: (bytes, int) -> Tuple[bytes, int]
     """Decode a length delimited byte array from buf and return a hex encoded string"""
     value, pos = decode_bytes(buf, pos)
     return binascii.hexlify(value), pos
 
 
 def decode_string(value, pos):
+    # type: (bytes, int) -> Tuple[str, int]
     """Decode a length delimited byte array as a string"""
     length, pos = varint.decode_varint(value, pos)
     end = pos + length
@@ -104,17 +125,19 @@ def decode_string(value, pos):
         return value[pos:end].decode("utf-8"), end
     except (TypeError, UnicodeDecodeError) as exc:
         six.raise_from(
-            DecoderException("Error decoding UTF-8 string %s" % value[pos:end]), exc
+            DecoderException("Error decoding UTF-8 string %r" % value[pos:end]), exc
         )
 
 
 def encode_tag(field_number, wire_type):
+    # type: (int, int) -> bytes
     # Not checking bounds here, should be check before
     tag_number = (field_number << 3) | wire_type
     return varint.encode_uvarint(tag_number)
 
 
 def decode_tag(buf, pos):
+    # type: (bytes, int) -> Tuple[int, int, int]
     tag_number, pos = varint.decode_uvarint(buf, pos)
     field_number = tag_number >> 3
     wire_type = tag_number & 0x7
@@ -122,13 +145,14 @@ def decode_tag(buf, pos):
 
 
 def encode_message(data, config, typedef, path=None, field_order=None):
+    # type: (Message, Config, TypeDef, Optional[List[str]], Optional[List[str]]) -> bytes
     """Encode a Python dictionary to a binary protobuf message"""
     output = bytearray()
     if path is None:
         path = []
 
     output_len = 0
-    field_outputs = {}
+    field_outputs = {}  # type: Dict[str, List[bytes]]
     for field_id, value in data.items():
         field_number, outputs = _encode_message_field(
             config, typedef, path, field_id, value
@@ -178,19 +202,15 @@ def encode_message(data, config, typedef, path=None, field_order=None):
 
 
 def _encode_message_field(config, typedef, path, field_id, value):
+    # type: (Config, TypeDef, List[str], str | int, Any) -> Tuple[str, List[bytes]]
     # Get the field number convert it as necessary
     alt_field_number = None
-
-    if six.PY2:
-        string_types = (str, unicode)
-    else:
-        string_types = str
 
     field_number = None
     # Convert the field_id, which could be a number or a name, into a field number
     # From a correctness standpoint, field_number should probably be an int
     # type, but IIRC that leads to headaches elsewhere
-    if isinstance(field_id, string_types):
+    if isinstance(field_id, six.text_type):
         if "-" in field_id:
             field_id, alt_field_number = field_id.split("-")
         if field_id.isdigit():
@@ -205,14 +225,14 @@ def _encode_message_field(config, typedef, path, field_id, value):
                     field_number = number
                     break
     else:
-        field_number = str(field_id)
+        field_number = six.ensure_text(str(field_id))
 
     field_path = path[:]
-    field_path.append(field_id)
+    field_path.append(str(field_number))
 
     if field_number is None or field_number not in typedef:
         raise EncoderException(
-            "Provided field name/number %s / $s is not valid"
+            "Provided field name/number %s / %s is not valid"
             % (field_id, field_number),
             field_path,
         )
@@ -228,7 +248,7 @@ def _encode_message_field(config, typedef, path, field_id, value):
     field_type = field_typedef["type"]
     field_order = field_typedef.get("field_order", None)
 
-    field_encoder = None
+    field_encoder = None  # type: Callable[[Any], bytes] | None
     if alt_field_number is not None:
         if alt_field_number not in field_typedef["alt_typedefs"]:
             raise EncoderException(
@@ -236,19 +256,18 @@ def _encode_message_field(config, typedef, path, field_id, value):
                 % (alt_field_number, field_number),
                 field_path,
             )
-        if isinstance(field_typedef["alt_typedefs"][alt_field_number], dict):
-            innertypedef = field_typedef["alt_typedefs"][alt_field_number]
+        alt_field_type = field_typedef["alt_typedefs"][alt_field_number]
+        if isinstance(alt_field_type, six.text_type):
+            # just let the field
+            field_type = alt_field_type
+        else:
+            innertypedef = alt_field_type
             field_encoder = lambda data: encode_lendelim_message(
                 data, config, innertypedef, path=field_path, field_order=field_order
             )
 
-        else:
-            # just let the field
-            field_type = field_typedef["alt_typedefs"][alt_field_number]
-
     if field_encoder is None:
         if field_type == "message":
-            innertypedef = None
             if "message_typedef" in field_typedef:
                 innertypedef = field_typedef["message_typedef"]
             elif "message_type_name" in field_typedef:
@@ -302,6 +321,7 @@ def _encode_message_field(config, typedef, path, field_id, value):
 
 
 def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=None):
+    # type: (bytes, Config, Optional[TypeDef], int, Optional[int], int, Optional[List[str]]) -> Tuple[Message, TypeDef, List[str], int]
     """Decode a protobuf message with no length prefix"""
     if end is None:
         end = len(buf)
@@ -315,7 +335,7 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
     if path is None:
         path = []
 
-    output = {}
+    output = {}  # type: Message
 
     grouped_fields, field_order, pos = _group_by_number(buf, pos, end, path)
     for field_number, (wire_type, buffers) in grouped_fields.items():
@@ -389,6 +409,7 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
 
 
 def _group_by_number(buf, pos, end, path):
+    # type: (bytes, int, int, List[str]) -> Tuple[Dict[str, Tuple[int, List[bytes]]], List[str], int]
     # Parse through the whole message and split into buffers based on wire
     # type and organized by field number. This forces us to parse the whole
     # message at once, but I think we're doing that anyway. This catches size
@@ -399,22 +420,22 @@ def _group_by_number(buf, pos, end, path):
     #         "2": (<wiretype>, [<data>])
     #     }
 
-    output_map = {}
+    output_map = {}  # type: Dict[str, Tuple[int, List[bytes]]]
     field_order = []
     while pos < end:
         # Read in a field
         field_number, wire_type, pos = decode_tag(buf, pos)
 
         # We want field numbers as strings everywhere
-        field_number = str(field_number)
+        field_id = six.ensure_text(str(field_number))
 
-        field_path = path[:] + [field_number]
+        field_path = path[:] + [field_id]
 
-        if field_number in output_map and output_map[field_number][0] != wire_type:
+        if field_id in output_map and output_map[field_id][0] != wire_type:
             # This should never happen
             raise DecoderException(
                 "Field %s has mistmatched wiretypes. Previous: %s Now: %s"
-                % (field_number, output_map[field_number][0], wire_type),
+                % (field_id, output_map[field_id][0], wire_type),
                 path=field_path,
             )
 
@@ -444,27 +465,28 @@ def _group_by_number(buf, pos, end, path):
         if pos + length > end:
             raise DecoderException(
                 "Decoded length for field %s goes over end: %d > %d"
-                % (field_number, pos + length, end),
+                % (field_id, pos + length, end),
                 path=field_path,
             )
 
         field_buf = buf[pos : pos + length]
 
-        if field_number in output_map:
-            output_map[field_number][1].append(field_buf)
+        if field_id in output_map:
+            output_map[field_id][1].append(field_buf)
         else:
-            output_map[field_number] = (wire_type, [field_buf])
-        field_order.append(field_number)
+            output_map[field_id] = (wire_type, [field_buf])
+        field_order.append(field_id)
         pos += length
     return output_map, field_order, pos
 
 
 def _get_field_key(field_number, typedef, path):
+    # type: (str | int, TypeDef, List[str]) -> str
     # Translate a field_number into a name if one is available in the typedef
-    if not isinstance(field_number, (int, str)):
+    if not isinstance(field_number, (int, six.text_type)):
         raise EncoderException("Field key in message must be a str or int", path=path)
     if isinstance(field_number, int):
-        field_number = str(field_number)
+        field_number = six.ensure_text(str(field_number))
 
     # handle an alt_typedef by transforming 1-1 to name-1
     # I don't think should actually be used with the current uses of
@@ -484,6 +506,9 @@ def _get_field_key(field_number, typedef, path):
 def _try_decode_lendelim_fields(
     buffers, field_key, field_typedef, message_output, config
 ):
+    # type: (List[bytes], str, FieldDef, Message, Config) -> None
+    # Mutates message_output
+
     # This is where things get weird
     # To start, since we want to decode messages and not treat every
     # embedded message as bytes, we have to guess if it's a message or
@@ -502,22 +527,22 @@ def _try_decode_lendelim_fields(
     # 'bytes' or string with an 'alt_type' if it doesn't parse
 
     try:
-        outputs_map = {}
-        field_order = []
+        outputs_map = {}  # type: Dict[str, Any]
+        field_order = []  # type: List[str]
         # grab all dictonary alt_typedefs
         all_typedefs = {
             # we don't want this to modify in-place if it fails
             key: copy.deepcopy(value)
             for key, value in field_typedef.get("alt_typedefs", {}).items()
             if isinstance(value, dict)
-        }
+        }  # type: Dict[str, TypeDef]
         all_typedefs["1"] = copy.deepcopy(field_typedef.get("message_typedef", {}))
 
         for buf in buffers:
             output = None
             output_typedef = None
             output_typedef_num = None
-            new_field_order = []
+            new_field_order = []  # type: List[str]
             for alt_typedef_num, alt_typedef in sorted(
                 all_typedefs.items(), key=lambda x: int(x[0])
             ):
@@ -538,10 +563,14 @@ def _try_decode_lendelim_fields(
                 output, output_typedef, new_field_order, _ = decode_lendelim_message(
                     buf, config, {}
                 )
-                output_typedef_num = str(
-                    max([int(i) for i in ["0"] + list(all_typedefs.keys())]) + 1
+                output_typedef_num = six.ensure_text(
+                    str(max([int(i) for i in ["0"] + list(all_typedefs.keys())]) + 1)
                 )
 
+            if output_typedef is None or output_typedef_num is None:
+                raise DecoderException(
+                    "Could not find an output_typedef or output_typedef_num. This should not happen under any circumstances."
+                )
             # save the output or typedef we found
             all_typedefs[output_typedef_num] = output_typedef
             output_list = outputs_map.get(output_typedef_num, [])
@@ -599,18 +628,20 @@ def _try_decode_lendelim_fields(
                 # we already had a message type. save it as an alt_typedef
 
                 # check if we already have this type as an alt_typedef
-                output_typedef_nums = {
-                    key: value
+                output_typedef_nums = [
+                    key
                     for key, value in field_typedef.setdefault(
                         "alt_typedefs", {}
                     ).items()
                     if value == target_type
-                }.keys()
+                ]
                 output_typedef_num = None
                 if len(output_typedef_nums) == 0:
                     # find the next largest alt typedef number to put this type as
-                    output_typedef_num = str(
-                        max([int(i) for i in ["0"] + all_typedefs.keys()]) + 1
+                    output_typedef_num = six.ensure_text(
+                        str(
+                            max([int(i) for i in ["0"] + list(all_typedefs.keys())]) + 1
+                        )
                     )
                     field_typedef.setdefault("alt_typedefs", {})[
                         output_typedef_num
@@ -630,6 +661,7 @@ def _try_decode_lendelim_fields(
 
 
 def encode_lendelim_message(data, config, typedef, path=None, field_order=None):
+    # type: (Message, Config, TypeDef, Optional[List[str]], Optional[List[str]]) -> bytes
     """Encode data as a length delimited protobuf message"""
     message_out = encode_message(
         data, config, typedef, path=path, field_order=field_order
@@ -640,6 +672,7 @@ def encode_lendelim_message(data, config, typedef, path=None, field_order=None):
 
 
 def decode_lendelim_message(buf, config, typedef=None, pos=0, depth=0, path=None):
+    # type: (bytes, Config, Optional[TypeDef], int, int, Optional[List[str]]) -> Tuple[Message, TypeDef, List[str], int]
     """Deocde a length delimited protobuf message from buf"""
     length, pos = varint.decode_varint(buf, pos)
     ret = decode_message(
@@ -649,9 +682,11 @@ def decode_lendelim_message(buf, config, typedef=None, pos=0, depth=0, path=None
 
 
 def generate_packed_encoder(wrapped_encoder):
+    # type: (Callable[[Any], bytes]) -> Callable[[List[Any]], bytes]
     """Generate an encoder for a packed type based on a base type encoder"""
 
     def length_wrapper(values):
+        # type: (List[Any]) -> bytes
         # Encode repeat values and prefix with the length
         output = bytearray()
         for value in values:
@@ -663,9 +698,11 @@ def generate_packed_encoder(wrapped_encoder):
 
 
 def generate_packed_decoder(wrapped_decoder):
+    # type: (Callable[[bytes, int], Tuple[Any, int]]) -> Callable[[bytes, int], Tuple[List[Any], int]]
     """Generate an decoder for a packed type based on a base type decoder"""
 
     def length_wrapper(buf, pos):
+        # type: (bytes, int) -> Tuple[List[Any], int]
         # Decode repeat values prefixed with the length
         length, pos = varint.decode_varint(buf, pos)
         end = pos + length

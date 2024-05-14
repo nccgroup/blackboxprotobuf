@@ -25,8 +25,19 @@ definition format.
 import io
 import re
 import logging
+import re
+import six
+
 from blackboxprotobuf.lib.exceptions import TypedefException, ProtofileException
 import blackboxprotobuf.lib.api
+
+if six.PY3:
+    import typing
+
+    if typing.TYPE_CHECKING:
+        from blackboxprotobuf.lib.config import Config
+        from typing import Any, TextIO, Tuple, Dict, Optional, List
+        from blackboxprotobuf.lib.pytypes import TypeDef, FieldDef
 
 PROTO_FILE_TYPE_MAP = {
     "uint": "uint64",
@@ -84,6 +95,7 @@ for packable_type in PACKABLE_TYPES:
 
 
 def _print_message(message_name, typedef, output_file, depth=0):
+    # type: (str, TypeDef, TextIO, int) -> None
     indent = "  " * depth
     if not NAME_REGEX.match(message_name):
         raise TypedefException("Message name: %s is not valid" % message_name)
@@ -112,7 +124,7 @@ def _print_message(message_name, typedef, output_file, depth=0):
             if not NAME_REGEX.match(field_name):
                 field_name = None
         if field_name is None:
-            field_name = "field%s" % field_number
+            field_name = six.ensure_text("field%s" % field_number)
 
         if field_typedef["type"] == "message":
             # If we have multiple typedefs, this means is something like the Any
@@ -158,18 +170,17 @@ def _print_message(message_name, typedef, output_file, depth=0):
 
 
 def export_proto(typedef_map, output_filename=None, output_file=None, package=None):
+    # type: (Dict[str, TypeDef], Optional[str], Optional[TextIO], Optional[str]) -> str | None
     """Export the given type definitons as a '.proto' file. Typedefs are
     expected as a dictionary of {'message_name': typedef }
 
     Write to output_file or output_filename if provided, otherwise return a string
     output_filename will be overwritten if it exists
     """
-    return_string = False
     if output_filename is not None:
         output_file = io.open(output_filename, "w+")
 
     if output_file is None:
-        return_string = True
         output_file = io.StringIO()
 
     # preamble
@@ -180,7 +191,7 @@ def export_proto(typedef_map, output_filename=None, output_file=None, package=No
     for typedef_name, typedef in typedef_map.items():
         _print_message(typedef_name, typedef, output_file)
 
-    if return_string:
+    if isinstance(output_file, io.StringIO):
         return output_file.getvalue()
     # close the file if we opened it
     elif output_filename is not None:
@@ -198,7 +209,8 @@ PACKAGE_REGEX = re.compile(r"^ *package +([a-zA-Z0-9_.]+) *;.*")
 
 
 def import_proto(config, input_string=None, input_filename=None, input_file=None):
-    typedef_map = {}
+    # type: (Config, Optional[str], Optional[str], Optional[TextIO]) -> Dict[str, TypeDef]
+    typedef_map = {}  # type: Dict[str, TypeDef]
     if input_string is not None:
         input_file = io.StringIO(input_string)
     if input_file is None and input_filename is not None:
@@ -218,11 +230,15 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
     while line:
         line = line.strip()
 
-        if line.startswith("syntax") and SYNTAX_REGEX.match(line):
-            syntax_version = SYNTAX_REGEX.match(line).group(1)
+        if line.startswith("syntax"):
+            syntax_match = SYNTAX_REGEX.match(line)
+            if syntax_match:
+                syntax_version = syntax_match.group(1)
 
-        elif line.startswith("package") and PACKAGE_REGEX.match(line):
-            package_prefix = PACKAGE_REGEX.match(line).group(1) + "."
+        elif line.startswith("package"):
+            package_match = PACKAGE_REGEX.match(line)
+            if package_match:
+                package_prefix = package_match.group(1) + "."
 
         elif line.startswith("import"):
             logging.warning(
@@ -231,13 +247,17 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
                 "processed first: %s",
                 line,
             )
-        elif line.startswith("enum") and ENUM_REGEX.match(line):
-            enum_name = _parse_enum(line, input_file)
-            enum_names.append(enum_name)
+        elif line.startswith("enum"):
+            enum_match = ENUM_REGEX.match(line)
+            if enum_match:
+                enum_name = _parse_enum(enum_match, line, input_file)
+                enum_names.append(enum_name)
 
-        elif line.startswith("message") and MESSAGE_START_REGEX.match(line):
-            message_tree = _preparse_message(line, input_file)
-            message_trees.append(message_tree)
+        elif line.startswith("message"):
+            message_start_match = MESSAGE_START_REGEX.match(line)
+            if message_start_match:
+                message_tree = _preparse_message(message_start_match, line, input_file)
+                message_trees.append(message_tree)
 
         line = input_file.readline()
 
@@ -263,11 +283,12 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
     return typedef_map
 
 
-def _parse_enum(line, input_file):
+def _parse_enum(enum_match, line, input_file):
+    # type: (re.Match[str], str, TextIO) -> str
     """Parse an enum out of the file. Goes from enum declaration to next }
     Returns the enum's name
     """
-    enum_name = ENUM_REGEX.match(line).group(1)
+    enum_name = enum_match.group(1)
     # parse until the next '}'
     while "}" not in line:
         line = input_file.readline()
@@ -276,9 +297,12 @@ def _parse_enum(line, input_file):
     return enum_name
 
 
-def _preparse_message(line, input_file):
+def _preparse_message(message_start_match, line, input_file):
+    # type: (re.Match[str], str, TextIO) -> Dict[str, Any]
+    # TODO Should put together better types than Any, but we'll stick with this
+    # for now
     """Parse out a message name and the lines that make it up"""
-    message_name = MESSAGE_START_REGEX.match(line).group(1)
+    message_name = message_start_match.group(1)
     message_lines = []
     inner_enums = []
     inner_messages = []
@@ -289,13 +313,19 @@ def _preparse_message(line, input_file):
             raise ProtofileException("Did not find close of message")
 
         line = line.strip()
-        if line.startswith("enum") and ENUM_REGEX.match(line):
-            enum_name = _parse_enum(line, input_file)
-            inner_enums.append(enum_name)
+        if line.startswith("enum"):
+            enum_match = ENUM_REGEX.match(line)
+            if enum_match:
+                enum_name = _parse_enum(enum_match, line, input_file)
+                inner_enums.append(enum_name)
 
-        elif line.startswith("message") and MESSAGE_START_REGEX.match(line):
-            message_tree = _preparse_message(line, input_file)
-            inner_messages.append(message_tree)
+        elif line.startswith("message"):
+            inner_message_start_match = MESSAGE_START_REGEX.match(line)
+            if inner_message_start_match:
+                message_tree = _preparse_message(
+                    inner_message_start_match, line, input_file
+                )
+                inner_messages.append(message_tree)
         # not an inner enum or message
         else:
             message_lines.append(line)
@@ -309,6 +339,7 @@ def _preparse_message(line, input_file):
 
 
 def _collect_names(prefix, message_tree):
+    # type: (str, Dict[str, Any]) -> Tuple[List[str], List[str]]
     message_names = []
     enum_names = []
 
@@ -324,6 +355,7 @@ def _collect_names(prefix, message_tree):
 
 
 def _check_message_name(current_path, name, known_message_names, config):
+    # type: (str, str, List[str], Config) -> str | None
     # Verify message name against preparsed message names and global
     # known_messages
     # For example, if we have:
@@ -335,7 +367,7 @@ def _check_message_name(current_path, name, known_message_names, config):
     # PackageA.Message.InnerMessage
     # should also work for enums
     if name in config.known_types:
-        return True
+        return name
     # search for anything under a common prefix in known_message_names
     logging.debug("Testing message name: %s", name)
 
@@ -365,6 +397,7 @@ def _check_message_name(current_path, name, known_message_names, config):
 def _parse_message(
     message_tree, typdef_map, known_message_names, enum_names, prefix, is_proto3, config
 ):
+    # type: (Dict[str, Any], Dict[str, TypeDef], List[str], List[str], str, bool, Config) -> None
     message_typedef = {}
     message_name = prefix + message_tree["name"]
     prefix = message_name + "."
@@ -399,12 +432,13 @@ def _parse_message(
 
 # parse a field into a dictionary for the typedef
 def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, config):
-    typedef = {}
+    # type: (re.Match[str], List[str], List[str], str, bool, Config) -> Tuple[str, FieldDef]
+    typedef = {}  # type: FieldDef
 
     field_name = match.group(3)
     if not field_name:
         raise ProtofileException("Could not parse field name from line: %s" % match)
-    typedef["name"] = field_name
+    typedef["name"] = six.ensure_text(field_name)
     field_number = match.group(4)
     if not field_number:
         raise ProtofileException("Could not parse field number from line: %s" % match)

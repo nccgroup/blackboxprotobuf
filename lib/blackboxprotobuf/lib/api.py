@@ -44,11 +44,21 @@ import collections
 import blackboxprotobuf.lib.protofile
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
-import blackboxprotobuf.lib.config
+from blackboxprotobuf.lib.config import default as default_config
 from blackboxprotobuf.lib.exceptions import TypedefException, EncoderException
+
+if six.PY3:
+    import typing
+
+    # Circular imports on Config if we don't check here
+    if typing.TYPE_CHECKING:
+        from typing import Dict, List, Optional
+        from blackboxprotobuf.lib.pytypes import Message, TypeDef, FieldDef
+        from blackboxprotobuf.lib.config import Config
 
 
 def decode_message(buf, message_type=None, config=None):
+    # type: (bytes, Optional[str | TypeDef], Optional[Config]) -> tuple[Message, TypeDef]
     """Decode a protobuf message and return a python dictionary representing
     the message.
 
@@ -72,14 +82,14 @@ def decode_message(buf, message_type=None, config=None):
     """
 
     if config is None:
-        config = blackboxprotobuf.lib.config.default
+        config = default_config
 
     if isinstance(buf, bytearray):
         buf = bytes(buf)
     buf = six.ensure_binary(buf)
     if message_type is None:
         message_type = {}
-    elif isinstance(message_type, str):
+    elif isinstance(message_type, six.text_type):
         if message_type not in config.known_types:
             message_type = {}
         else:
@@ -92,6 +102,7 @@ def decode_message(buf, message_type=None, config=None):
 
 
 def encode_message(value, message_type, config=None):
+    # type: (Message, str | TypeDef, Optional[Config]) -> bytes
     """Re-encode a python dictionary as a binary protobuf message.
 
     Args:
@@ -109,14 +120,14 @@ def encode_message(value, message_type, config=None):
     """
 
     if config is None:
-        config = blackboxprotobuf.lib.config.default
+        config = default_config
 
     if message_type is None:
         raise EncoderException(
             "Encode message must have valid type definition. message_type cannot be None"
         )
 
-    if isinstance(message_type, str):
+    if isinstance(message_type, six.text_type):
         if message_type not in config.known_types:
             raise EncoderException(
                 "The provided message type name (%s) is not known. Encoding requires a valid type definition"
@@ -131,7 +142,8 @@ def encode_message(value, message_type, config=None):
     )
 
 
-def protobuf_to_json(*args, **kwargs):
+def protobuf_to_json(buf, message_type=None, config=None):
+    # type: (bytes, Optional[str | TypeDef], Optional[Config]) -> tuple[str, TypeDef]
     """Decode a protobuf message and return a JSON string representing the
     message.
 
@@ -156,17 +168,16 @@ def protobuf_to_json(*args, **kwargs):
         provided, but may add additional fields if new fields were encountered
         during decoding.
     """
-    value, message_type = decode_message(*args, **kwargs)
-    value = _json_safe_transform(
-        value, message_type, False, config=kwargs.get("config", None)
-    )
-    value = _sort_output(value, message_type, config=kwargs.get("config", None))
+    value, message_type = decode_message(buf, message_type, config)
+    value = _json_safe_transform(value, message_type, False, config=config)
+    value = _sort_output(value, message_type, config=config)
     _annotate_typedef(message_type, value)
     message_type = sort_typedef(message_type)
     return json.dumps(value, indent=2), message_type
 
 
-def protobuf_from_json(json_str, message_type, *args, **kwargs):
+def protobuf_from_json(json_str, message_type, config=None):
+    # type: (str, str | TypeDef, Optional[Config]) -> bytes
     """Re-encode a JSON string as a binary protobuf message.
 
     Args:
@@ -183,13 +194,23 @@ def protobuf_from_json(json_str, message_type, *args, **kwargs):
     Returns:
         A bytearray containing the encoded protobuf message.
     """
+    if config is None:
+        config = default_config
+    if isinstance(message_type, six.text_type):
+        if message_type not in config.known_types:
+            raise EncoderException(
+                'protobuf_from_json must have valid type definition. message_type "%s" is not known'
+                % message_type
+            )
+        message_type = config.known_types[message_type]
     value = json.loads(json_str)
     _strip_typedef_annotations(message_type)
     value = _json_safe_transform(value, message_type, True)
-    return encode_message(value, message_type, *args, **kwargs)
+    return encode_message(value, message_type, config)
 
 
 def export_protofile(message_types, output_filename):
+    # type: (Dict[str, TypeDef], str) -> None
     """This function attempts to export a set of message type definitions to a
     `.proto` file for use with other tools.
 
@@ -206,6 +227,7 @@ def export_protofile(message_types, output_filename):
 
 
 def import_protofile(input_filename, save_to_known=True, config=None):
+    # type: (str, bool, Optional[Config]) -> Dict[str, TypeDef] | None
     """This function attempts to import a set of message type definitions from a
     `.proto` file.
 
@@ -226,13 +248,14 @@ def import_protofile(input_filename, save_to_known=True, config=None):
         type definitions as the values.
     """
     if config is None:
-        config = blackboxprotobuf.lib.config.default
+        config = default_config
 
     new_typedefs = blackboxprotobuf.lib.protofile.import_proto(
         config, input_filename=input_filename
     )
     if save_to_known:
         config.known_types.update(new_typedefs)
+        return None
     else:
         return new_typedefs
 
@@ -241,6 +264,7 @@ NAME_REGEX = re.compile(r"\A[a-zA-Z][a-zA-Z0-9_]*\Z")
 
 
 def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
+    # type: (TypeDef, Optional[TypeDef], Optional[Config], Optional[List[str]]) -> None
     """Attempt to validate a type definition object is valid.
 
     This function attempts to ensure a type definition is valid before it is
@@ -266,7 +290,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
     if _path is None:
         _path = []
     if config is None:
-        config = blackboxprotobuf.lib.config.default
+        config = default_config
 
     int_keys = set()
     field_names = set()
@@ -278,7 +302,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
         # Validate field_number is a number
         if not str(field_number).isdigit():
             raise TypedefException("Field number must be a digit: %s" % field_number)
-        field_number = str(field_number)
+        field_number = six.ensure_text(str(field_number))
 
         field_path = _path[:]
         field_path.append(field_number)
@@ -342,7 +366,16 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
                         field_path,
                     )
             # Check for duplicate names
-            if key == "name" and value.strip() != "":
+            if key == "name":
+                if not isinstance(value, six.text_type):
+                    raise TypedefException(
+                        "Invalid type for name field in typedef: %r. Field number %s"
+                        % (value, field_number),
+                        field_path,
+                    )
+                if value.strip() == "":
+                    continue
+
                 if value.lower() in field_names:
                     raise TypedefException(
                         ('Duplicate field name "%s" for field ' "number %s")
@@ -358,8 +391,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
                         % (value, field_number, "[a-zA-Z_][a-zA-Z0-9_]*"),
                         field_path,
                     )
-                if value != "":
-                    field_names.add(value.lower())
+                field_names.add(value.lower())
 
             # Check if message type name is known
             if key == "message_type_name":
@@ -374,7 +406,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
                     )
 
             # Recursively validate inner typedefs
-            if key in ["message_typedef", "group_typedef"]:
+            if key == "message_typedef":
                 if isinstance(value, dict):
                     if (
                         old_typedef is not None
@@ -383,14 +415,16 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
                     ):
                         validate_typedef(
                             value,
-                            old_typedef=old_typedef[field_number][key],
+                            old_typedef=old_typedef[field_number]["message_typedef"],
                             _path=field_path,
                             config=config,
                         )
                     else:
                         validate_typedef(value, _path=field_path, config=config)
             if key == "alt_typedefs":
-                for alt_field_number, alt_typedef in value.items():
+                for alt_field_number, alt_typedef in field_typedef[
+                    "alt_typedefs"
+                ].items():
                     if isinstance(alt_typedef, dict):
                         validate_typedef(alt_typedef, _path=field_path, config=config)
 
@@ -420,6 +454,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
 
 
 def _json_safe_transform(values, typedef, toBytes, config=None):
+    # type: (Message, TypeDef, bool, Optional[Config]) -> Message
     # Python's JSON doesn't have a default way to handle 'bytes' types. To
     # handle this, we want some string like encoding which JSON can handle but
     # can also handle arbitrary bytes. This method get's more complicated than
@@ -438,7 +473,7 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
     # backslash escape mechanisms parsing back to bytes.
 
     if config is None:
-        config = blackboxprotobuf.lib.config.default
+        config = default_config
     name_map = {
         item["name"]: number
         for number, item in typedef.items()
@@ -452,6 +487,8 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
             % values
         )
     for name, value in values.items():
+        if isinstance(name, int):
+            name = six.ensure_text(str(name))
         alt_number = None
         base_name = name
         if "-" in name:
@@ -468,7 +505,7 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
                 % field_number
             )
 
-        field_type = typedef[field_number]["type"]
+        field_type = typedef[field_number]["type"]  # type: str | TypeDef
         if field_type == "message":
             field_typedef = _get_typedef_for_message(typedef[field_number], config)
             if alt_number is not None:
@@ -511,6 +548,7 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
 
 
 def _get_typedef_for_message(field_typedef, config):
+    # type: (FieldDef, Config) -> TypeDef
     assert field_typedef["type"] == "message"
     if "message_typedef" in field_typedef:
         return field_typedef["message_typedef"]
@@ -528,15 +566,18 @@ def _get_typedef_for_message(field_typedef, config):
 
 
 def _sort_output(value, typedef, config=None):
+    # type: (Message, TypeDef, Optional[Config]) -> Message
     # Sort output by the field number in the typedef. Helps with readability in
     # a JSON dump
-    output_dict = collections.OrderedDict()
+    output_dict = collections.OrderedDict()  # type: Message
     if config is None:
-        config = blackboxprotobuf.lib.config.default
+        config = default_config
 
     # Make a list of all the field names we have, aggregate together the alt fields as well
-    field_names = {}
+    field_names = {}  # type: Dict[str, List[tuple[str, str | None]]]
     for field_name in value.keys():
+        if isinstance(field_name, int):
+            field_name = six.ensure_text(str(field_name))
         if "-" in field_name:
             field_name_base, alt_number = field_name.split("-")
         else:
@@ -545,7 +586,7 @@ def _sort_output(value, typedef, config=None):
         field_names.setdefault(field_name_base, []).append((field_name, alt_number))
 
     for field_number, field_def in sorted(typedef.items(), key=lambda t: int(t[0])):
-        field_number = str(field_number)
+        field_number = six.ensure_text(str(field_number))
         seen_field_names = field_names.get(field_number, [])
 
         # Try getting matching fields by name as well
@@ -568,22 +609,39 @@ def _sort_output(value, typedef, config=None):
                         )
                         % (alt_number, field_number)
                     )
-                field_type = field_def["alt_typedefs"][alt_number]
-                if isinstance(field_type, dict):
-                    field_message_typedef = field_type
+                alt_field_type = field_def["alt_typedefs"][alt_number]
+                if isinstance(alt_field_type, dict):
+                    field_message_typedef = alt_field_type
                     field_type = "message"
+                else:
+                    field_type = alt_field_type
 
             if field_type == "message":
-                if not isinstance(value[field_name], list):
-                    output_dict[field_name] = _sort_output(
-                        value[field_name], field_message_typedef
+                if field_message_typedef is None:
+                    raise TypedefException(
+                        'Message does not have an associated typedef: "%s"' % field_name
                     )
-                else:
+                field_value = value.get(field_name)
+                if isinstance(field_value, list):
                     output_dict[field_name] = []
-                    for field_value in value[field_name]:
+                    for field_value_item in field_value:
+                        if not isinstance(field_value_item, dict):
+                            raise TypedefException(
+                                'Message values must be a dictionary type. Field name: "%s"'
+                                % field_name
+                            )
                         output_dict[field_name].append(
-                            _sort_output(field_value, field_message_typedef)
+                            _sort_output(field_value_item, field_message_typedef)
                         )
+                else:
+                    if not isinstance(field_value, dict):
+                        raise TypedefException(
+                            'Message values must be a dictionary type. Field name: "%s"'
+                            % field_name
+                        )
+                    output_dict[field_name] = _sort_output(
+                        field_value, field_message_typedef
+                    )
             else:
                 output_dict[field_name] = value[field_name]
 
@@ -591,6 +649,7 @@ def _sort_output(value, typedef, config=None):
 
 
 def sort_typedef(typedef):
+    # type: (TypeDef) -> TypeDef
     """Apply special sorting rules to the type definition to improve readability.
 
     Sorts the fields of a type definition so that important fields such as the
@@ -612,32 +671,40 @@ def sort_typedef(typedef):
         "message_type_name",
         "example_value_ignored",
         "field_order",
+        "seen_repeated",
+        "message_typedef",
+        "alt_typedefs",
     ]
     output_dict = collections.OrderedDict()
 
-    for field_number, field_def in sorted(typedef.items(), key=lambda t: int(t[0])):
+    for field_number, field_def in sorted(
+        typedef.items(), key=lambda t: int(t[0])
+    ):  # Sort by type number
         output_field_def = collections.OrderedDict()
-        field_def = field_def.copy()
-        for key in TYPEDEF_KEY_ORDER:
-            if key in field_def:
-                output_field_def[key] = field_def[key]
-                del field_def[key]
-        for key, value in field_def.items():
+        for key, value in sorted(
+            field_def.items(), key=lambda t: (TYPEDEF_KEY_ORDER.index(t[0]), t[1])
+        ):  # sort by special keys, then value
             if key == "message_typedef":
-                output_field_def[key] = sort_typedef(value)
+                output_field_def[key] = sort_typedef(value)  # type: ignore
             else:
-                output_field_def[key] = value
+                output_field_def[key] = value  # type: ignore
+
         output_dict[field_number] = output_field_def
+    if six.PY3 and typing.TYPE_CHECKING:
+        return typing.cast(
+            TypeDef, output_dict
+        )  # Cast because typing doesn't like the ordered dict
     return output_dict
 
 
 def _annotate_typedef(typedef, message):
+    # type: (TypeDef, Message) -> None
     # Add values from message into the typedef so it's easier to figure out
     # which field when you're editing manually
 
     for field_number, field_def in typedef.items():
         field_value = None
-        field_name = str(field_number)
+        field_name = six.ensure_text(str(field_number))
         if field_name not in message and field_def.get("name", "") != "":
             field_name = field_def["name"]
 
@@ -656,10 +723,11 @@ def _annotate_typedef(typedef, message):
         # Add a blank name field if the field doesn't have one, so it's easier
         # to add
         if "name" not in field_def:
-            field_def["name"] = ""
+            field_def["name"] = six.u("")
 
 
 def _strip_typedef_annotations(typedef):
+    # type: (TypeDef) -> None
     # Remove example values placed by _annotate_typedef
     for _, field_def in typedef.items():
         if "example_value_ignored" in field_def:

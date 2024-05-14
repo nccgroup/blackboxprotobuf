@@ -84,6 +84,7 @@ def test_proto_export_inverse(tmp_path, x, name):
     possible proto files we want to try importing"""
     config = Config()
     typedef, message = x
+    name = six.ensure_text(name)
     with tempfile.NamedTemporaryFile(
         mode="r+", dir=str(tmp_path), suffix=".proto", delete=True
     ) as outfile:

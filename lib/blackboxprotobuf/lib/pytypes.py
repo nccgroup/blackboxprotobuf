@@ -1,3 +1,7 @@
+"""This module provides top level types for adding type definitions to the
+blackboxprotobuf library.
+"""
+
 # Copyright (c) 2018-2024 NCC Group Plc
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,33 +22,30 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import zlib
-
-from blackboxprotobuf.lib.exceptions import BlackboxProtobufException
-
 import six
 
+
 if six.PY3:
-    from typing import Tuple
+    from typing import Any, Dict, List, TypedDict
 
+    # We say messages can have any value
+    # Functions we define may have fixed types, but someone could add a type
+    # function that outputs any arbitrary object
+    Message = Dict[str | int, Any]
 
-def is_gzip(buf):
-    # type: (bytes) -> bool
-    return buf.startswith(bytearray([0x1F, 0x8B, 0x08]))
+    TypeDef = Dict[str, "FieldDef"]
 
-
-def decode_gzip(buf):
-    # type: (bytes) -> Tuple[bytes, str]
-    if buf.startswith(bytearray([0x1F, 0x8B, 0x08])):
-        decompressor = zlib.decompressobj(31)
-        return decompressor.decompress(buf), "gzip"
-    else:
-        raise BlackboxProtobufException(
-            "Cannot decode as gzip: magic bytes don't match"
-        )
-
-
-def encode_gzip(buf):
-    # type: (bytes) -> bytes
-    compressor = zlib.compressobj(-1, zlib.DEFLATED, 31)
-    return compressor.compress(buf) + compressor.flush()
+    FieldDef = TypedDict(
+        "FieldDef",
+        {
+            "name": str,
+            "type": str,
+            "message_type_name": str,
+            "message_typedef": TypeDef,
+            "alt_typedefs": Dict[str, str | TypeDef],
+            "example_value_ignored": Any,
+            "seen_repeated": bool,
+            "field_order": List[str],
+        },
+        total=False,
+    )

@@ -22,12 +22,16 @@ import six
 import struct
 from blackboxprotobuf.lib.exceptions import BlackboxProtobufException
 
+if six.PY3:
+    from typing import Tuple
+
 # gRPC over HTTP2 spec: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
 
 HEADER_LEN = 1 + 4
 
 
 def is_grpc(payload):
+    # type: (bytes) -> bool
     if len(payload) < HEADER_LEN:
         return False
     if six.PY2 and isinstance(payload, bytearray):
@@ -43,6 +47,7 @@ def is_grpc(payload):
 
 
 def decode_grpc(payload):
+    # type: (bytes) -> Tuple[bytes, str]
     """Decode GRPC. Return the protobuf data"""
     if six.PY2 and isinstance(payload, bytearray):
         payload = bytes(payload)
@@ -78,6 +83,7 @@ def decode_grpc(payload):
 
 
 def encode_grpc(data, encoding="grpc"):
+    # type: (bytes, str) -> bytes
     if encoding != "grpc":
         raise BlackboxProtobufException(
             "Error encoding GRPC with encoding %s. GRPC is only supported with no compression"
