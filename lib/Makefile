@@ -1,4 +1,4 @@
-all: test_py2 test_py3
+all: check test_py2 test_py3
 setup_py2:
 	rm -rf /tmp/bbpb-python2-tmp
 	python2 -m virtualenv /tmp/bbpb-python2-tmp
@@ -11,6 +11,8 @@ test_py3:
 	poetry run python -m pytest tests/py_test/
 format:
 	poetry run black --exclude deps/ .
+check:
+	poetry run mypy --strict blackboxprotobuf/
 prepublish:
 	poetry build
 	poetry config repositories.test-pypi https://test.pypi.org/legacy/

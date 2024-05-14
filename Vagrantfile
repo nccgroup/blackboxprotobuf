@@ -22,5 +22,6 @@ Vagrant.configure("2") do |config|
     cd blackboxprotobuf/lib
     #poetry env use python2 && poetry install --no-root
     poetry env use python3 && poetry install --no-root
+    poetry env use python3 && poetry run mypy --install-types
   SHELL
 end
