@@ -33,7 +33,7 @@ uses the Blackbox Protobuf library to decode and edit proxied protobuf messages.
    `mitmproxy`.
    
    ```
-   pip isntall bbpb
+   pip install bbpb
    ```
    
    If `mitmproxy` is installed within a virtual environment, then the `bbpb`
