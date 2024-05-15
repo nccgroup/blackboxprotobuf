@@ -84,9 +84,11 @@ def message_typedef_gen(draw, max_depth=3, anon=False, types=None, named_fields=
 
         if field_type.startswith("packed"):
             output[field_number]["seen_repeated"] = True
-        elif (
-            anon and field_type == "message"
-        ):  # seen_repeated blows up our anon tests right now TODO: improve anon tests to handle this
+        elif anon and field_type in [
+            "message",
+            "string",
+            "bytes",
+        ]:  # repeated fields can't be tested easily with anonymous types due to the type guessing
             output[field_number]["seen_repeated"] = False
         else:
             output[field_number]["seen_repeated"] = draw(st.booleans())
