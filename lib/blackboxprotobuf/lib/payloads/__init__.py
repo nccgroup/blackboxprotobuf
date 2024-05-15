@@ -51,8 +51,10 @@ def _none_decoder(buf):
 
 # Decoder by name
 def decode_payload(buf, decoder):
+    if decoder is None:
+        return buf, "none"
     decoder = decoder.lower()
-    if decoder is None or decoder == "none":
+    if decoder == "none":
         return buf, "none"
     elif decoder.startswith("grpc"):
         return grpc.decode_grpc(buf)
@@ -64,8 +66,10 @@ def decode_payload(buf, decoder):
 
 # Encode by name, should pass in the results from the decode function
 def encode_payload(buf, encoder):
+    if encoder is None:
+        return buf
     encoder = encoder.lower()
-    if encoder is None or encoder == "none":
+    if encoder == "none":
         return buf
     elif encoder.startswith("grpc"):
         return grpc.encode_grpc(buf, encoder)
