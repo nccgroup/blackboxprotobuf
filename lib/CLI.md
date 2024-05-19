@@ -17,13 +17,13 @@ pip install bbpb
 The command line interface can then be run with:
 
 ~~~
-python -m blackboxprotobuf
+bbpb
 ~~~
 
-Consider using an alias for to save keystrokes:
+or
 
 ~~~
-alias bbpb='python -m blackboxprotbuf'
+python3 -m blackboxprotobuf
 ~~~
 
 ## Usage
@@ -32,24 +32,24 @@ alias bbpb='python -m blackboxprotbuf'
 
 Simple Decoder:
 ~~~
-cat test_data | python -m blackboxprotobuf -r
+cat test_data | bbpb -r
 ~~~
 
 Save type for editing:
 ~~~
-cat test_data | python -m blackboxprotobuf -ot ./saved_type.json
+cat test_data | bbpb -ot ./saved_type.json
 ~~~
 
 Decode with type:
 ~~~
-cat test_data | python -m blackboxprotobuf -it ./saved_type.json
+cat test_data | bbpb -it ./saved_type.json
 ~~~
 
 Decode edit and re-encode:
 ~~~
-cat test_data | python -m blackboxprotobuf  > message.json
+cat test_data | bbpb  > message.json
 vim message.json
-cat message.json | python -m blackboxprotobuf -e > test_data_out
+cat message.json | bbpb -e > test_data_out
 ~~~
 
 
