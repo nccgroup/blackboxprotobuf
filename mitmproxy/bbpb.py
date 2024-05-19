@@ -136,6 +136,9 @@ class BlackboxProtobufAddon:
                     f"Flow part is response-body, but flow has no response"
                 )
             message = flow.response
+        elif flow_part == "websocket":
+            # Edit the last websocket
+            message = flow.websocket.messages[-1]
         else:
             raise exceptions.CommandError(f"Got unknown flow_part: {flow_part}")
 
@@ -390,7 +393,12 @@ class BlackboxProtobufAddon:
             raise exceptions.CommandError("No flow selected.")
 
         # Prompts the user for the section to edit
-        if flow.response:
+        if flow.websocket:
+            if len(flow.websocket.messages) > 0:
+                return ["websocket"]
+            else:
+                return []
+        elif flow.response:
             return [
                 "request-body",
                 "response-body",

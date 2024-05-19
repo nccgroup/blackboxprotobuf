@@ -83,8 +83,9 @@ message. Currently supported flow parts are:
 
 * `request-body`
 * `response-body`
-* `websocket-request` (not supported for `bbpb.edit`)
-* `websocket-response` (not supported for `bbpb.edit`)
+* `websocket` (for `bbpb.edit`, not supported with `bbpb.edit_type`)
+* `websocket-request` (for `bbpb.edit_type`, not supported for `bbpb.edit`)
+* `websocket-response` (for `bbpb.edit_type`, not supported for `bbpb.edit`)
 
 Command arguments support tab completion.
 
@@ -94,10 +95,14 @@ The `:bbpb.edit` command will open a text editor with the protobuf decoded to
 JSON, similar to editing other HTTP messages in mitmproxy. The edited JSON
 payload will be re-encoded to protobuf to be replayed or resumed.
 
-The edit command can be used to modify request or response bodies. At the
-moment, mitmproxy does not appear to allow websocket messages to be edited
-interactively. It may be possible to edit websocket messages programmatically by
-registering the `websocket-message` event handler in an addon.
+
+The `request-body` and `response-body` flow parts will edit protobuf messages
+in the HTTP body. The `websocket` flow parts will edit the last message in the
+websocket flow.
+
+The addon does not support protobuf payloads elsewhere in the HTTP message at
+the moment, though you should be able to customize the addon for a particular
+use case.
 
 #### `:bbpb.edit_type`
 
