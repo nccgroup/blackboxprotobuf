@@ -23,41 +23,44 @@ import zlib
 import Test_pb2
 import struct
 
-payload_type = "gzip"
 
-message = Test_pb2.TestMessage(testString="test123").SerializeToString()
+for payload_type in ["none", "gzip", "grpc"]:
+    message = Test_pb2.TestMessage(testString="test123").SerializeToString()
+    print(f"Sending payload encoded with {payload_type}")
+    if payload_type == "gzip":
+        message = zlib.compress(message, level=9, wbits=31)
+    elif payload_type == "grpc":
+        # Fake grpc wrapper
+        length = len(message)
+        old_message = message
+        message = bytearray()
+        message.append(0x00)
+        message.extend(struct.pack(">I", length))
+        message.extend(old_message)
 
-if payload_type == "gzip":
-    message = zlib.compress(message, level=9, wbits=31)
-elif payload_type == "grpc":
-    # Fake grpc wrapper
-    length = len(message)
-    old_message = message
-    message = bytearray()
-    message.append(0x00)
-    message.extend(struct.pack(">I", length))
-    message.extend(old_message)
+    response = requests.post(
+        "http://localhost:8000",
+        data=message,
+        headers={
+            "content-type": "application/protobuf",
+            "payload_encoding": payload_type,
+        },
+        proxies={"http": "http://localhost:8080"},
+    )
+    print(f"Got response: {response.status_code} {response.text}")
+    response_content = response.content
 
-response = requests.post(
-    "http://localhost:8000",
-    data=message,
-    headers={"content-type": "application/protobuf"},
-    proxies={"http": "http://localhost:8080"},
-)
-print(f"Got response: {response.status_code} {response.text}")
-response_content = response.content
+    if payload_type == "gzip":
+        response_content = zlib.decompress(response_content, wbits=31)
+    elif payload_type == "grpc":
+        old_response_content = response_content
+        compression_byte = response_content[0]
+        assert compression_byte == 0
+        length = struct.unpack_from(">I", response_content[1:])[0]
+        response_content = old_response_content[5:]
+        assert length == len(response_content)
 
-if payload_type == "gzip":
-    response_content = zlib.decompress(response_content, wbits=31)
-elif payload_type == "grpc":
-    old_response_content = response_content
-    compression_byte = response_content[0]
-    assert compression_byte == 0
-    length = struct.unpack_from(">I", response_content[1:])[0]
-    response_content = old_response_content[5:]
-    assert length == len(response_content)
+    response_message = Test_pb2.TestMessage()
+    response_message.ParseFromString(response_content)
 
-response_message = Test_pb2.TestMessage()
-response_message.ParseFromString(response_content)
-
-print(f"Got response message: {response_message}")
+    print(f"Got response message: {response_message}")

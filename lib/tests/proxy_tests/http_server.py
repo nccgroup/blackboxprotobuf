@@ -24,12 +24,10 @@ import zlib
 import struct
 
 
-payload_type = "gzip"
-
-
 class TestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
-        print("Got connection")
+        payload_type = self.headers.get("payload_encoding", "none")
+        print(f"Got connection with payload encoding: {payload_type}")
         data = self.rfile.read1()
         if payload_type == "gzip":
             data = zlib.decompress(data, wbits=31)
