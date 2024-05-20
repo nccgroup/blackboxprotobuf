@@ -42,10 +42,6 @@ improve user friendliness.
 
 # Usage
 ## Installation    
-This library depends on internal functions of Google's protobuf Python library
-to do some encoding/decoding of individual fields and six for python 2
-compatibility.
-
 The package can be installed from source with:
 
 ```
@@ -60,6 +56,8 @@ pip install bbpb
 ```
 
 ## CLI
+The package defines a `bbpb` command for command line encoding/decoding.
+
 For command line usage see [CLI.md](./CLI.md).
 
 ## Interface
