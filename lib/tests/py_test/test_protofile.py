@@ -60,6 +60,9 @@ def test_proto_export(tmp_path, typedef, name):
 
         note(typedef_map)
 
+        # Trying exporting as string first
+        protofile.export_proto(typedef_map)
+
         protofile.export_proto(typedef_map, output_file=outfile)
 
         py_out = str(tmp_path / "py_out")
