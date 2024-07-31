@@ -181,6 +181,7 @@ def test_encode_json(x):
     hypothesis.note(json.loads(json_str))
 
     encoded = blackboxprotobuf.protobuf_from_json(json_str, testMessage_typedef)
+    assert not isinstance(encoded, list)
     hypothesis.note("BBP decoding:")
 
     test_decode, _ = blackboxprotobuf.decode_message(encoded, testMessage_typedef)
@@ -240,6 +241,7 @@ def test_modify_json(x, modify_num):
     encoded = blackboxprotobuf.protobuf_from_json(
         json.dumps(decoded), testMessage_typedef
     )
+    assert not isinstance(encoded, list)
     message = Test_pb2.TestMessage()
     message.ParseFromString(encoded)
 

@@ -23,12 +23,14 @@
 from hypothesis import given, assume, note, example, reproduce_failure
 import hypothesis.strategies as st
 import strategies
+import json
 import six
 import binascii
 
 from blackboxprotobuf.lib.config import Config
 from blackboxprotobuf.lib.types import length_delim
 from blackboxprotobuf.lib.types import type_maps
+from blackboxprotobuf.lib.payloads import grpc, gzip
 import blackboxprotobuf
 
 
@@ -44,6 +46,7 @@ def test_message_json_inverse(x):
     encoded_json = blackboxprotobuf.protobuf_from_json(
         decoded_json, config=config, message_type=typedef_out
     )
+    assert not isinstance(encoded_json, list)
     decoded, typedef_out = blackboxprotobuf.decode_message(
         encoded_json, config=config, message_type=typedef
     )
@@ -51,6 +54,23 @@ def test_message_json_inverse(x):
     assert isinstance(encoded, bytearray)
     assert isinstance(decoded, dict)
     assert message == decoded
+
+
+@given(x=strategies.gen_message(), n=st.integers(min_value=2, max_value=10))
+def test_multiple_encoding(x, n):
+    config = Config()
+    typedef, message = x
+    encoded = length_delim.encode_message(message, config, typedef)
+
+    bufs = [encoded] * n
+    message_json, typedef_out = blackboxprotobuf.protobuf_to_json(bufs, typedef, config)
+    messages = json.loads(message_json)
+    assert isinstance(messages, list)
+    assert len(messages) == n
+
+    encoded2 = blackboxprotobuf.protobuf_from_json(message_json, typedef, config)
+    assert isinstance(encoded2, list)
+    assert len(encoded2) == n
 
 
 @given(x=strategies.gen_message(anon=True))
@@ -73,6 +93,7 @@ def test_anon_json_decode(x):
     encoded_json = blackboxprotobuf.protobuf_from_json(
         decoded_json, config=config, message_type=typedef_out
     )
+    assert not isinstance(encoded_json, list)
     decoded, typedef_out = blackboxprotobuf.decode_message(
         encoded_json, config=config, message_type=typedef
     )

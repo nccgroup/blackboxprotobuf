@@ -61,6 +61,30 @@ def test_grpc():
     assert encoding == "grpc"
 
 
+@given(payloads=st.lists(st.binary(), min_size=2))
+def test_grpc_multiple(payloads):
+    # Test grpc encoding with multiple payloads
+
+    # Manually encode multiple grpc payloads and string them together
+    encoded = b""
+    for payload in payloads:
+        encoded += grpc.encode_grpc(payload)
+
+    assert grpc.is_grpc(encoded)
+
+    # Make sure we can decode bytes with multiple grpc
+    decoded, encoding = grpc.decode_grpc(encoded)
+    assert isinstance(decoded, list)
+    assert len(decoded) == len(payloads)
+
+    for x, y in zip(decoded, payloads):
+        assert x == y
+
+    # Make sure we can encode to the same bytes
+    encoded2 = grpc.encode_grpc(decoded)
+    assert encoded == encoded2
+
+
 @given(data=st.binary())
 def test_grpc_inverse(data):
     encoding = "grpc"
