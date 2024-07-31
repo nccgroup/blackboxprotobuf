@@ -155,12 +155,12 @@ def encode_message(value, message_type, config=None):
 
 
 def protobuf_to_json(buf, message_type=None, config=None):
-    # type: (bytes, Optional[str | TypeDef], Optional[Config]) -> tuple[str, TypeDef]
-    """Decode a protobuf message and return a JSON string representing the
-    message.
+    # type: (bytes | list[bytes], Optional[str | TypeDef], Optional[Config]) -> tuple[str, TypeDef]
+    """Decode a protobuf messages and return a JSON string representing the
+    messages.
 
     Args:
-        buf: Bytes representing an encoded protobuf message
+        buf: One or more bytes representing encoded protobuf messages
         message_type: Optional type to use as the base for decoding. Allows for
             customizing field types or names. Can be a python dictionary or a
             message type name which maps to the `known_types` dictionary in the
@@ -170,8 +170,8 @@ def protobuf_to_json(buf, message_type=None, config=None):
             `known_types` array. Defaults to
             `blackboxprotobuf.lib.config.default` if not provided.
     Returns:
-        A tuple containing a JSON string representing the message and a type
-        definition for re-encoding the message.
+        A tuple containing a JSON string representing the messages and a type
+        definition for re-encoding the messages.
 
         The JSON string and type definition are annotated and sorted for
         readability.
@@ -180,16 +180,35 @@ def protobuf_to_json(buf, message_type=None, config=None):
         provided, but may add additional fields if new fields were encountered
         during decoding.
     """
-    value, message_type = decode_message(buf, message_type, config)
-    value = _json_safe_transform(value, message_type, False, config=config)
-    value = _sort_output(value, message_type, config=config)
-    _annotate_typedef(message_type, value)
+    values = []
+    bufs = buf if isinstance(buf, list) else [buf]
+
+    if len(bufs) == 0:
+        raise DecoderException("No protobuf bytes were provided")
+
+    for data in bufs:
+        value, message_type = decode_message(data, message_type, config)
+        value = _json_safe_transform(value, message_type, False, config=config)
+        value = _sort_output(value, message_type, config=config)
+        values.append(value)
+
+    if not isinstance(message_type, dict):
+        # Shouldn't happen because of len(bufs) check, but make the type checker happy and verify edge cases
+        raise DecoderException(
+            "Error decoding to json: Could not find valid message_type type (dict). Found: %s"
+            % type(message_type)
+        )
+    _annotate_typedef(message_type, values[0])
     message_type = sort_typedef(message_type)
-    return json.dumps(value, indent=2), message_type
+
+    if not isinstance(buf, list) and len(values) == 1:
+        return json.dumps(values[0], indent=2), message_type
+    else:
+        return json.dumps(values, indent=2), message_type
 
 
 def protobuf_from_json(json_str, message_type, config=None):
-    # type: (str, str | TypeDef, Optional[Config]) -> bytes
+    # type: (str, str | TypeDef, Optional[Config]) -> bytes | list[bytes]
     """Re-encode a JSON string as a binary protobuf message.
 
     Args:
@@ -221,9 +240,19 @@ def protobuf_from_json(json_str, message_type, config=None):
         )
 
     value = json.loads(json_str)
+    values = value if isinstance(value, list) else [value]
+
     _strip_typedef_annotations(message_type)
-    value = _json_safe_transform(value, message_type, True)
-    return encode_message(value, message_type, config)
+    values = [_json_safe_transform(message, message_type, True) for message in values]
+
+    payloads = []
+    for message in values:
+        payloads.append(encode_message(message, message_type, config))
+
+    if not isinstance(value, list) and len(payloads) == 1:
+        return payloads[0]
+    else:
+        return payloads
 
 
 def export_protofile(message_types, output_filename):
