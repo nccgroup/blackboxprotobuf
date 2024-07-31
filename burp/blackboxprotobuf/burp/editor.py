@@ -523,7 +523,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
         self._payload_info.protobuf_data = protobuf_data
 
         new_json, new_typedef = blackboxprotobuf.protobuf_to_json(
-            str(protobuf_data), typedef
+            protobuf_data, typedef
         )
 
         self._last_good = LastGoodData(new_json, new_typedef, source)
