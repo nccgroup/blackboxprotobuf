@@ -210,7 +210,7 @@ def _encode_message_field(config, typedef, path, field_id, value):
     # Convert the field_id, which could be a number or a name, into a field number
     # From a correctness standpoint, field_number should probably be an int
     # type, but IIRC that leads to headaches elsewhere
-    if isinstance(field_id, six.text_type):
+    if isinstance(field_id, six.string_types):
         if "-" in field_id:
             field_id, alt_field_number = field_id.split("-")
         if field_id.isdigit():
@@ -257,13 +257,19 @@ def _encode_message_field(config, typedef, path, field_id, value):
                 field_path,
             )
         alt_field_type = field_typedef["alt_typedefs"][alt_field_number]
-        if isinstance(alt_field_type, six.text_type):
+        if isinstance(alt_field_type, six.string_types):
             # just let the field
             field_type = alt_field_type
-        else:
+        elif isinstance(alt_field_type, dict):
             innertypedef = alt_field_type
             field_encoder = lambda data: encode_lendelim_message(
                 data, config, innertypedef, path=field_path, field_order=field_order
+            )
+        else:
+            raise TypedefException(
+                "Provided alt field type for field %s is not valid: %s"
+                % (alt_field_number, alt_field_type),
+                field_path,
             )
 
     if field_encoder is None:
@@ -483,7 +489,7 @@ def _group_by_number(buf, pos, end, path):
 def _get_field_key(field_number, typedef, path):
     # type: (str | int, TypeDef, List[str]) -> str
     # Translate a field_number into a name if one is available in the typedef
-    if not isinstance(field_number, (int, six.text_type)):
+    if not isinstance(field_number, (int, six.string_types)):
         raise EncoderException("Field key in message must be a str or int", path=path)
     if isinstance(field_number, int):
         field_number = six.ensure_text(str(field_number))

@@ -45,7 +45,11 @@ import blackboxprotobuf.lib.protofile
 import blackboxprotobuf.lib.types.length_delim
 import blackboxprotobuf.lib.types.type_maps
 from blackboxprotobuf.lib.config import default as default_config
-from blackboxprotobuf.lib.exceptions import TypedefException, EncoderException
+from blackboxprotobuf.lib.exceptions import (
+    TypedefException,
+    EncoderException,
+    DecoderException,
+)
 
 if six.PY3:
     import typing
@@ -89,12 +93,16 @@ def decode_message(buf, message_type=None, config=None):
     buf = six.ensure_binary(buf)
     if message_type is None:
         message_type = {}
-    elif isinstance(message_type, six.text_type):
+    elif isinstance(message_type, six.string_types):
         if message_type not in config.known_types:
             message_type = {}
         else:
             message_type = config.known_types[message_type]
 
+    if not isinstance(message_type, dict):
+        raise DecoderException(
+            "Decode message received an invalid typedef type. Typedef should be a string with a message name, a dictionary, or None"
+        )
     value, typedef, _, _ = blackboxprotobuf.lib.types.length_delim.decode_message(
         buf, config, message_type
     )
@@ -127,7 +135,7 @@ def encode_message(value, message_type, config=None):
             "Encode message must have valid type definition. message_type cannot be None"
         )
 
-    if isinstance(message_type, six.text_type):
+    if isinstance(message_type, six.string_types):
         if message_type not in config.known_types:
             raise EncoderException(
                 "The provided message type name (%s) is not known. Encoding requires a valid type definition"
@@ -135,6 +143,10 @@ def encode_message(value, message_type, config=None):
             )
         message_type = config.known_types[message_type]
 
+    if not isinstance(message_type, dict):
+        raise EncoderException(
+            "Encode message received an invalid typedef type. Typedef should be a string with a message name or a dictionary."
+        )
     return bytes(
         blackboxprotobuf.lib.types.length_delim.encode_message(
             value, config, message_type
@@ -196,13 +208,18 @@ def protobuf_from_json(json_str, message_type, config=None):
     """
     if config is None:
         config = default_config
-    if isinstance(message_type, six.text_type):
+    if isinstance(message_type, six.string_types):
         if message_type not in config.known_types:
             raise EncoderException(
                 'protobuf_from_json must have valid type definition. message_type "%s" is not known'
                 % message_type
             )
         message_type = config.known_types[message_type]
+    if not isinstance(message_type, dict):
+        raise EncoderException(
+            "Encode message received an invalid typedef type. Typedef should be a string with a message name or a dictionary."
+        )
+
     value = json.loads(json_str)
     _strip_typedef_annotations(message_type)
     value = _json_safe_transform(value, message_type, True)
@@ -367,7 +384,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
                     )
             # Check for duplicate names
             if key == "name":
-                if not isinstance(value, six.text_type):
+                if not isinstance(value, six.string_types):
                     raise TypedefException(
                         "Invalid type for name field in typedef: %r. Field number %s"
                         % (value, field_number),
