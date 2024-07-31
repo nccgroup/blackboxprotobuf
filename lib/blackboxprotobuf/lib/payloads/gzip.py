@@ -45,6 +45,10 @@ def decode_gzip(buf):
 
 
 def encode_gzip(buf):
-    # type: (bytes) -> bytes
+    # type: (bytes | list[bytes]) -> bytes
+    if isinstance(buf, list):
+        raise BlackboxProtobufException(
+            "Cannot encode as gzip: multiple buffers are not supported"
+        )
     compressor = zlib.compressobj(-1, zlib.DEFLATED, 31)
     return compressor.compress(buf) + compressor.flush()

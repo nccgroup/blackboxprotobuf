@@ -36,63 +36,83 @@ def is_grpc(payload):
         return False
     if six.PY2 and isinstance(payload, bytearray):
         payload = bytes(payload)
-    compression_byte = six.indexbytes(payload, 0)
-    # Change this to support 0x1 once we support compression
-    if compression_byte != 0:
-        return False
-    message_length = struct.unpack_from(">I", payload[1:])[0]
-    if len(payload) != HEADER_LEN + message_length:
+    pos = 0
+    while pos < len(payload):
+        compression_byte = six.indexbytes(payload, pos)
+        # Change this to support 0x1 once we support compression
+        if compression_byte != 0:
+            return False
+        message_length = struct.unpack_from(">I", payload[pos + 1 : pos + 5])[0]
+        pos += message_length + 5
+
+    if pos != len(payload):
         return False
     return True
 
 
 def decode_grpc(payload):
-    # type: (bytes) -> Tuple[bytes, str]
+    # type: (bytes) -> Tuple[bytes | list[bytes], str]
     """Decode GRPC. Return the protobuf data"""
     if six.PY2 and isinstance(payload, bytearray):
         payload = bytes(payload)
-    if len(payload) < HEADER_LEN:
+
+    if len(payload) == 0:
+        raise BlackboxProtobufException("Error decoding GRPC. Payload is empty")
+
+    pos = 0
+    payloads = []
+    while pos + HEADER_LEN <= len(payload):
+        compression_byte = six.indexbytes(payload, pos)
+        pos += 1
+        if compression_byte != 0x00:
+            if compression_byte == 0x01:
+                # Payload is compressed
+                # If a payload is compressed, the compression method is specified in the `grpc-encoding` header
+                # Options are  "identity" / "gzip" / "deflate" / "snappy" / {custom}
+                raise BlackboxProtobufException(
+                    "Error decoding GRPC. Compressed payloads are not supported"
+                )
+            else:
+                raise BlackboxProtobufException(
+                    "Error decoding GRPC. First byte must be 0 or 1 to indicate compression"
+                )
+
+        message_length = struct.unpack_from(">I", payload[pos : pos + 4])[0]
+        pos += 4
+
+        if len(payload) < pos + message_length:
+            raise BlackboxProtobufException(
+                "Error decoding GRPC. Payload length does not match encoded gRPC length"
+            )
+
+        payloads.append(payload[pos : pos + message_length])
+        pos += message_length
+
+    if pos != len(payload):
         raise BlackboxProtobufException(
-            "Error decoding GRPC, payload is not long enough: %d" % len(payload)
+            "Error decoding GRPC. Payload length does not match encoded gRPC lengths"
         )
 
-    compression_byte = six.indexbytes(payload, 0)
-    if compression_byte != 0x00:
-        if compression_byte == 0x01:
-            # Payload is compressed
-            # If a payload is compressed, the compression method is specified in the `grpc-encoding` header
-            # Options are  "identity" / "gzip" / "deflate" / "snappy" / {custom}
-            raise BlackboxProtobufException(
-                "Error decoding GRPC. Compressed payloads are not supported"
-            )
-        else:
-            raise BlackboxProtobufException(
-                "Error decoding GRPC. First byte must be 0 or 1 to indicate compression"
-            )
-
-    message_length = struct.unpack_from(">I", payload[1:])[0]
-
-    if len(payload) != HEADER_LEN + message_length:
-        raise BlackboxProtobufException(
-            "Error decoding GRPC. Payload length does not match encoded gRPC length"
-        )
-
-    data = payload[HEADER_LEN:]
-
-    return data, "grpc"
+    if len(payloads) > 1:
+        return payloads, "grpc"
+    else:
+        return payloads[0], "grpc"
 
 
 def encode_grpc(data, encoding="grpc"):
-    # type: (bytes, str) -> bytes
+    # type: (bytes | list[bytes], str) -> bytes
     if encoding != "grpc":
         raise BlackboxProtobufException(
             "Error encoding GRPC with encoding %s. GRPC is only supported with no compression"
             % encoding
         )
 
+    datas = data if isinstance(data, list) else [data]
+
     payload = bytearray()
-    payload.append(0x00)  # No compression
-    payload.extend(struct.pack(">I", len(data)))  # Length
-    payload.extend(data)
+    for data in datas:
+        payload.append(0x00)  # No compression
+        payload.extend(struct.pack(">I", len(data)))  # Length
+        payload.extend(data)
 
     return payload
