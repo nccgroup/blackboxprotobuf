@@ -28,6 +28,7 @@ import binascii
 from blackboxprotobuf.lib.config import Config
 from blackboxprotobuf.lib.types import length_delim
 from blackboxprotobuf.lib.types import type_maps
+from blackboxprotobuf.lib.typedef import TypeDef
 
 
 # Test for bug when alt typedef string is unicode/string
@@ -40,15 +41,15 @@ def test_alt_typedef_unicode():
 
     message = {"1-1": "test"}
 
-    data = length_delim.encode_message(message, config, typedef)
-    length_delim.decode_message(data, config, typedef)
+    data = length_delim.encode_message(message, config, TypeDef.from_dict(typedef))
+    length_delim.decode_message(data, config, TypeDef.from_dict(typedef))
 
     # try unicode too
     typedef = {
         "1": {"type": "message", "message_typedef": {}, "alt_typedefs": {"1": "string"}}
     }
-    data = length_delim.encode_message(message, config, typedef)
-    length_delim.decode_message(data, config, typedef)
+    data = length_delim.encode_message(message, config, TypeDef.from_dict(typedef))
+    length_delim.decode_message(data, config, TypeDef.from_dict(typedef))
 
 
 def test_alt_field_id_unicode():
@@ -61,11 +62,11 @@ def test_alt_field_id_unicode():
 
     message = {"1-1": "test"}
 
-    data = length_delim.encode_message(message, config, typedef)
-    length_delim.decode_message(data, config, typedef)
+    data = length_delim.encode_message(message, config, TypeDef.from_dict(typedef))
+    length_delim.decode_message(data, config, TypeDef.from_dict(typedef))
 
     # try unicode
     message = {"1-1": "test"}
 
-    data = length_delim.encode_message(message, config, typedef)
-    length_delim.decode_message(data, config, typedef)
+    data = length_delim.encode_message(message, config, TypeDef.from_dict(typedef))
+    length_delim.decode_message(data, config, TypeDef.from_dict(typedef))

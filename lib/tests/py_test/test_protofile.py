@@ -39,6 +39,7 @@ import blackboxprotobuf.lib
 import blackboxprotobuf.lib.protofile as protofile
 from blackboxprotobuf.lib.types import length_delim
 from blackboxprotobuf.lib.config import Config
+from blackboxprotobuf.lib.typedef import TypeDef
 
 
 to_suppress = []
@@ -138,18 +139,20 @@ def test_proto_export_inverse(tmp_path, x, name):
 
         note(new_typedef_map[name])
         # try to actually encode a message with the typedef
-        encode_forward = length_delim.encode_message(message, config, typedef_map[name])
+        encode_forward = length_delim.encode_message(
+            message, config, TypeDef.from_dict(typedef_map[name])
+        )
 
         config.known_types = new_typedef_map
         encode_backward = length_delim.encode_message(
-            message, config, new_typedef_map[name]
+            message, config, TypeDef.from_dict(new_typedef_map[name])
         )
 
         decode_forward, _, _, _ = length_delim.decode_message(
-            encode_forward, config, new_typedef_map[name]
+            encode_forward, config, TypeDef.from_dict(new_typedef_map[name])
         )
         decode_backward, _, _, _ = length_delim.decode_message(
-            encode_backward, config, typedef_map[name]
+            encode_backward, config, TypeDef.from_dict(typedef_map[name])
         )
 
 
@@ -198,7 +201,9 @@ def test_proto_decode(tmp_path, x, name):
     ) as outfile:
         typedef_map = {name: typedef}
 
-        encoded_message = length_delim.encode_message(message, config, typedef)
+        encoded_message = length_delim.encode_message(
+            message, config, TypeDef.from_dict(typedef)
+        )
 
         note(typedef_map)
         basename = os.path.basename(outfile.name)

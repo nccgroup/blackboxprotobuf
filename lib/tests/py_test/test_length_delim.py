@@ -23,11 +23,13 @@ import hypothesis.strategies as st
 import collections
 import strategies
 import six
+import copy
 import binascii
 
 from blackboxprotobuf.lib.config import Config
 from blackboxprotobuf.lib.types import length_delim
 from blackboxprotobuf.lib.types import type_maps
+from blackboxprotobuf.lib.typedef import TypeDef
 
 if six.PY2:
     string_types = (unicode, str)
@@ -55,9 +57,12 @@ def test_bytes_guess_inverse(x):
     wrapper_message = {"1": x}
 
     encoded = length_delim.encode_lendelim_message(
-        wrapper_message, config, wrapper_typedef
+        wrapper_message, config, TypeDef.from_dict(wrapper_typedef)
     )
-    value, typedef, _, pos = length_delim.decode_lendelim_message(encoded, config, {})
+    value, typedef, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, TypeDef()
+    )
+    typedef = typedef.to_dict()
 
     # would like to fail if it guesses wrong, but sometimes it might parse as a message
     assume(typedef["1"]["type"] == "bytes")
@@ -92,10 +97,13 @@ def test_string_inverse(x):
 def test_message_inverse(x):
     config = Config()
     typedef, message = x
-    encoded = length_delim.encode_lendelim_message(message, config, typedef)
-    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
-        encoded, config, typedef, 0
+    encoded = length_delim.encode_lendelim_message(
+        message, config, TypeDef.from_dict(typedef)
     )
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, TypeDef.from_dict(typedef), 0
+    )
+    typedef_out = typedef_out.to_dict()
     note(encoded)
     note(typedef)
     note(typedef_out)
@@ -109,10 +117,13 @@ def test_message_inverse(x):
 def test_anon_decode(x):
     config = Config()
     typedef, message = x
-    encoded = length_delim.encode_lendelim_message(message, config, typedef)
-    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
-        encoded, config, {}, 0
+    encoded = length_delim.encode_lendelim_message(
+        message, config, TypeDef.from_dict(typedef)
     )
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, TypeDef(), 0
+    )
+    typedef_out = typedef_out.to_dict()
     note("Original message: %r" % message)
     note("Decoded message: %r" % decoded)
     note("Original typedef: %r" % typedef)
@@ -161,8 +172,9 @@ def test_anon_decode(x):
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_bytes(orig_value),
                             config,
-                            new_field_typedef,
+                            TypeDef.from_dict(new_field_typedef),
                         )
+                        orig_field_typedef = orig_field_typedef.to_dict()
                     else:
                         # string value
                         (
@@ -173,8 +185,9 @@ def test_anon_decode(x):
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_string(orig_value),
                             config,
-                            new_field_typedef,
+                            TypeDef.from_dict(new_field_typedef),
                         )
+                        orig_field_typedef = orig_field_typedef.to_dict()
                     orig_typedef[field_number]["message_typedef"] = orig_field_typedef
                 orig_type = "message"
 
@@ -221,12 +234,13 @@ def test_message_guess_inverse(x):
     wrapper_message = {"1": message}
 
     encoded = length_delim.encode_lendelim_message(
-        wrapper_message, config, wrapper_typedef
+        wrapper_message, config, TypeDef.from_dict(wrapper_typedef)
     )
     note("Encoded length %d" % len(encoded))
     value, decoded_type, _, pos = length_delim.decode_lendelim_message(
-        encoded, config, {}
+        encoded, config, TypeDef()
     )
+    decoded_type = decoded_type.to_dict()
 
     note(value)
     assert decoded_type["1"]["type"] == "message"
@@ -246,13 +260,18 @@ def test_message_guess_bytes(bytes_in):
     # embed it in a another message so we get proper type guessing
     wrapper_typedef = {"1": {"type": "bytes"}}
     wrapper_message = {"1": bytes_in}
-    bytes_in = length_delim.encode_message(wrapper_message, config, wrapper_typedef)
+    bytes_in = length_delim.encode_message(
+        wrapper_message, config, TypeDef.from_dict(wrapper_typedef)
+    )
 
     decoded_message, guessed_typedef, field_order, pos = length_delim.decode_message(
-        bytes_in, config, {}
+        bytes_in, config, TypeDef()
     )
+    guessed_typedef = guessed_typedef.to_dict()
     assert pos == len(bytes_in)
-    bytes_out = length_delim.encode_message(decoded_message, config, guessed_typedef)
+    bytes_out = length_delim.encode_message(
+        decoded_message, config, TypeDef.from_dict(guessed_typedef)
+    )
     assert bytes_in == bytes_out
 
 
@@ -271,18 +290,23 @@ def test_message_ordering(x, rng):
     message = {"1": message}
 
     # encode to bytes first
-    message_bytes = length_delim.encode_message(message, config, typedef)
+    message_bytes = length_delim.encode_message(
+        message, config, TypeDef.from_dict(typedef)
+    )
 
     # now we have bytes that could be decoded as a message, we don't care what the original typedef is
     decoded_message, typedef, _, _ = length_delim.decode_message(
-        message_bytes, config, {}
+        message_bytes, config, TypeDef()
     )
+    typedef = typedef.to_dict()
 
     message_items = list(decoded_message["1"].items())
     rng.shuffle(message_items)
     decoded_message["1"] = collections.OrderedDict(message_items)
 
-    new_message_bytes = length_delim.encode_message(decoded_message, config, typedef)
+    new_message_bytes = length_delim.encode_message(
+        decoded_message, config, TypeDef.from_dict(typedef)
+    )
 
     assert message_bytes == new_message_bytes
 
@@ -379,20 +403,26 @@ def test_seen_repeated():
     }
 
     # Make sure we set seen_repeated for lists with multiple items
-    encoded = length_delim.encode_lendelim_message(message, config, typedef)
-    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
-        encoded, config, typedef, 0
+    encoded = length_delim.encode_lendelim_message(
+        message, config, TypeDef.from_dict(typedef)
     )
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, TypeDef.from_dict(typedef), 0
+    )
+    typedef_out = typedef_out.to_dict()
     assert "seen_repeated" in typedef_out["1"]
     assert typedef_out["1"]["seen_repeated"]
     assert "seen_repeated" in typedef_out["2"]
     assert typedef_out["2"]["seen_repeated"]
 
     message = {"1": 1, "2": {"1": 1}}
-    encoded = length_delim.encode_lendelim_message(message, config, typedef)
-    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
-        encoded, config, typedef, 0
+    encoded = length_delim.encode_lendelim_message(
+        message, config, TypeDef.from_dict(typedef)
     )
+    decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
+        encoded, config, TypeDef.from_dict(typedef), 0
+    )
+    typedef_out = typedef_out.to_dict()
     # Make sure we don't set seen_repeated for single
     assert "seen_repeated" not in typedef_out["1"]
     assert "seen_repeated" not in typedef_out["2"]
@@ -400,8 +430,9 @@ def test_seen_repeated():
     typedef["1"]["seen_repeated"] = True
     typedef["2"]["seen_repeated"] = True
     decoded, typedef_out, _, pos = length_delim.decode_lendelim_message(
-        encoded, config, typedef, 0
+        encoded, config, TypeDef.from_dict(typedef), 0
     )
+    typedef_out = typedef_out.to_dict()
     # Make sure we preserve seen_repeated and output as a list
     assert "seen_repeated" in typedef_out["1"]
     assert typedef_out["1"]["seen_repeated"]
@@ -412,3 +443,66 @@ def test_seen_repeated():
     assert typedef_out["2"]["seen_repeated"]
     # Make sure our output is a list, even though it only has one list
     assert isinstance(decoded["2"], list)
+
+
+def test_immutable_typedef():
+    # we want to ensure that the original typedef is never modified by a decode operation
+    config = Config()
+
+    typedef0 = {
+        "1": {"type": "int"},
+        "2": {
+            "type": "message",
+            "message_typedef": {"1": {"type": "int"}},
+            "alt_typedefs": {
+                "2": "bytes",
+                "3": {"1": {"type": "fixed64"}},
+            },
+        },
+    }
+    typedef0_deepcopy = copy.deepcopy(typedef0)
+    message0 = {
+        "1": 1,
+        "2": {"1": 1},
+    }
+    data0 = length_delim.encode_lendelim_message(
+        message0, config, TypeDef.from_dict(typedef0)
+    )
+
+    typedef1 = {
+        "1": {"type": "int"},
+        "2": {"type": "string"},
+    }
+    message1 = {
+        "1": 5,
+        "2": "Test123",
+    }
+    data1 = length_delim.encode_lendelim_message(
+        message1, config, TypeDef.from_dict(typedef1)
+    )
+
+    length_delim.decode_lendelim_message(data1, config, TypeDef.from_dict(typedef0))
+    assert typedef0 == typedef0_deepcopy
+
+    typedef2 = {
+        "1": {"type": "int"},
+        "2": {
+            "type": "message",
+            "message_typedef": {"1": {"type": "int"}, "2": {"type": "int"}},
+        },
+        "3": {"type": "int"},
+    }
+    message2 = {
+        "1": 7,
+        "2": {
+            "1": 1,
+            "2": 3,
+        },
+        "3": 8,
+    }
+    data2 = length_delim.encode_lendelim_message(
+        message2, config, TypeDef.from_dict(typedef2)
+    )
+
+    length_delim.decode_lendelim_message(data2, config, TypeDef.from_dict(typedef0))
+    assert typedef0 == typedef0_deepcopy

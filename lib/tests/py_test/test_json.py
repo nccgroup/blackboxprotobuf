@@ -30,6 +30,7 @@ import binascii
 from blackboxprotobuf.lib.config import Config
 from blackboxprotobuf.lib.types import length_delim
 from blackboxprotobuf.lib.types import type_maps
+from blackboxprotobuf.lib.typedef import TypeDef
 from blackboxprotobuf.lib.payloads import grpc, gzip
 import blackboxprotobuf
 
@@ -38,7 +39,7 @@ import blackboxprotobuf
 def test_message_json_inverse(x):
     config = Config()
     typedef, message = x
-    encoded = length_delim.encode_message(message, config, typedef)
+    encoded = length_delim.encode_message(message, config, TypeDef.from_dict(typedef))
     decoded_json, typedef_out = blackboxprotobuf.protobuf_to_json(
         encoded, config=config, message_type=typedef
     )
@@ -60,7 +61,7 @@ def test_message_json_inverse(x):
 def test_multiple_encoding(x, n):
     config = Config()
     typedef, message = x
-    encoded = length_delim.encode_message(message, config, typedef)
+    encoded = length_delim.encode_message(message, config, TypeDef.from_dict(typedef))
 
     bufs = [encoded] * n
     message_json, typedef_out = blackboxprotobuf.protobuf_to_json(bufs, typedef, config)
@@ -147,8 +148,9 @@ def test_anon_json_decode(x):
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_bytes(orig_value),
                             config,
-                            new_field_typedef,
+                            TypeDef.from_dict(new_field_typedef),
                         )
+                        orig_field_typedef = orig_field_typedef.to_dict()
                     else:
                         # string value
                         (
@@ -159,8 +161,9 @@ def test_anon_json_decode(x):
                         ) = length_delim.decode_lendelim_message(
                             length_delim.encode_string(orig_value),
                             config,
-                            new_field_typedef,
+                            TypeDef.from_dict(new_field_typedef),
                         )
+                        orig_field_typedef = orig_field_typedef.to_dict()
                     orig_typedef[field_number]["message_typedef"] = orig_field_typedef
                 orig_type = "message"
 
