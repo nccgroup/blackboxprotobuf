@@ -30,7 +30,7 @@ from typing import Any, Dict, Optional, Tuple
 from .lib.exceptions import BlackboxProtobufException
 from .lib import api
 from .lib import payloads
-from .lib.pytypes import TypeDef, Message
+from .lib.pytypes import TypeDefDict, Message
 
 
 def main():
@@ -81,7 +81,7 @@ def main():
     args = parser.parse_args()
 
     message = None  # type:  str | bytes | Message | None
-    typedef = None  # type: TypeDef | None
+    typedef = None  # type: TypeDefDict | None
     payload_encoding = None  # type: str | None
 
     if args.input_type:
@@ -150,7 +150,7 @@ def _write_output(args, data):
 
 
 def _read_input_typedef_arg(args):
-    # type: (argparse.Namespace) -> Tuple[TypeDef, Optional[str]]
+    # type: (argparse.Namespace) -> Tuple[TypeDefDict, Optional[str]]
     with open(args.input_type, "r") as f:
         input_json = json.load(f)
     if "typedef" in input_json:
@@ -161,7 +161,7 @@ def _read_input_typedef_arg(args):
 
 
 def _write_output_typedef_arg(args, typedef):
-    # type: (argparse.Namespace, Dict[str, str | TypeDef]) -> None
+    # type: (argparse.Namespace, Dict[str, str | TypeDefDict]) -> None
     with open(args.output_type, "w") as f:
         f.write(_to_json(args, typedef))
 
@@ -175,7 +175,7 @@ def _to_json(args, data):
 
 
 def _read_input_json_encoding(args, input_json, typedef, payload_encoding):
-    # type: (argparse.Namespace, Message | Dict[str, str | Message | TypeDef], Optional[TypeDef], Optional[str]) -> Tuple[Message, Optional[TypeDef], Optional[str]]
+    # type: (argparse.Namespace, Message | Dict[str, str | Message | TypeDefDict], Optional[TypeDefDict], Optional[str]) -> Tuple[Message, Optional[TypeDefDict], Optional[str]]
     if typedef is None and "typedef" not in input_json:
         sys.stderr.write(
             "Error: Did not get a typedef from --input-type or stdin. A typedef is required for encoding\n"
@@ -188,7 +188,7 @@ def _read_input_json_encoding(args, input_json, typedef, payload_encoding):
         return typing.cast(Message, input_json), typedef, None
 
     if typedef is None:
-        typedef = typing.cast(TypeDef | None, input_json.get("typedef"))
+        typedef = typing.cast(TypeDefDict | None, input_json.get("typedef"))
 
     if payload_encoding is None:
         json_payload_encoding = input_json.get("payload_encoding")
@@ -206,7 +206,7 @@ def _read_input_json_encoding(args, input_json, typedef, payload_encoding):
 
 
 def _read_input_json_decoding(args, input_json, typedef, payload_encoding):
-    # type: (argparse.Namespace, Dict[str, TypeDef | str], Optional[TypeDef], Optional[str]) -> Tuple[bytes, Optional[TypeDef], Optional[str]]
+    # type: (argparse.Namespace, Dict[str, TypeDefDict | str], Optional[TypeDefDict], Optional[str]) -> Tuple[bytes, Optional[TypeDefDict], Optional[str]]
     # Return message, typedef, payload_encoding
     message = typing.cast(str | None, input_json.get("protobuf_data"))
     if message is None:
@@ -214,7 +214,7 @@ def _read_input_json_decoding(args, input_json, typedef, payload_encoding):
         sys.exit(1)
 
     if typedef is None:
-        typedef = typing.cast(TypeDef | None, input_json.get("typedef"))
+        typedef = typing.cast(TypeDefDict | None, input_json.get("typedef"))
 
     if payload_encoding is None:
         payload_encoding = typing.cast(str | None, input_json.get("payload_encoding"))
@@ -226,7 +226,7 @@ def _read_input_json_decoding(args, input_json, typedef, payload_encoding):
 
 
 def _encode(args, message, typedef, payload_encoding):
-    # type: (argparse.Namespace, Message, TypeDef, Optional[str]) -> int
+    # type: (argparse.Namespace, Message, TypeDefDict, Optional[str]) -> int
     if typedef is None:
         sys.stderr.write("Error: Cannot encode without a valid typedef")
         return 1
@@ -256,7 +256,7 @@ def _encode(args, message, typedef, payload_encoding):
 
 
 def _decode(args, data, typedef, payload_encoding):
-    # type: (argparse.Namespace, bytes, Optional[TypeDef], str) -> int
+    # type: (argparse.Namespace, bytes, Optional[TypeDefDict], str) -> int
     if len(data) == 0:
         sys.stderr.write("Error: Input data cannot be empty\n")
         return 1
@@ -292,7 +292,7 @@ def _decode(args, data, typedef, payload_encoding):
     message = json.loads(message_json)
 
     if args.output_type:
-        output_typedef_data = {}  # type: Dict[str, TypeDef | str]
+        output_typedef_data = {}  # type: Dict[str, TypeDefDict | str]
         output_typedef_data["typedef"] = output_typedef
         if payload_encoding != "none":
             output_typedef_data["payload_encoding"] = payload_encoding

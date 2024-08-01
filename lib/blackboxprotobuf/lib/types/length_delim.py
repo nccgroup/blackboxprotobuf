@@ -33,6 +33,13 @@ from blackboxprotobuf.lib.exceptions import (
     EncoderException,
     DecoderException,
     TypedefException,
+    BlackboxProtobufException,
+)
+from blackboxprotobuf.lib.typedef import (
+    TypeDef,
+    MutableTypeDef,
+    FieldDef,
+    MutableFieldDef,
 )
 
 if six.PY3:
@@ -41,7 +48,7 @@ if six.PY3:
     if typing.TYPE_CHECKING:
         from blackboxprotobuf.lib.config import Config
         from typing import Any, Callable, Dict, Tuple, Optional, List
-        from blackboxprotobuf.lib.pytypes import Message, TypeDef, FieldDef
+        from blackboxprotobuf.lib.pytypes import Message
 
 
 def encode_string(value):
@@ -160,13 +167,9 @@ def encode_message(data, config, typedef, path=None, field_order=None):
 
         # In case the field number is represented in multiple locations in data
         # (eg. as an int, as name, as a string with an int)
-        if field_number in field_outputs:
-            field_outputs[field_number].extend(outputs)
-        else:
-            field_outputs[field_number] = outputs
+        field_outputs.setdefault(field_number, []).extend(outputs)
         output_len += len(outputs)
 
-    output = bytearray()
     if output_len > 0:
         if (
             config.preserve_field_order
@@ -203,105 +206,52 @@ def encode_message(data, config, typedef, path=None, field_order=None):
 
 def _encode_message_field(config, typedef, path, field_id, value):
     # type: (Config, TypeDef, List[str], str | int, Any) -> Tuple[str, List[bytes]]
-    # Get the field number convert it as necessary
-    alt_field_number = None
 
-    field_number = None
-    # Convert the field_id, which could be a number or a name, into a field number
-    # From a correctness standpoint, field_number should probably be an int
-    # type, but IIRC that leads to headaches elsewhere
-    if isinstance(field_id, six.string_types):
-        if "-" in field_id:
-            field_id, alt_field_number = field_id.split("-")
-        if field_id.isdigit():
-            field_number = field_id
-        else:
-            for number, info in typedef.items():
-                if (
-                    info.get("name", "") != ""
-                    and info["name"] == field_id
-                    and field_id != ""
-                ):
-                    field_number = number
-                    break
+    if not isinstance(field_id, six.text_type):
+        field_key = six.ensure_text(str(field_id))  # type: str
     else:
-        field_number = six.ensure_text(str(field_id))
+        field_key = field_id
+
+    fielddef_results = typedef.lookup_fielddef(field_key)
+
+    if fielddef_results is None:
+        raise EncoderException(
+            "Provided field name/number %s is not valid" % (field_key),
+            path,
+        )
+    field_number, fielddef = fielddef_results
 
     field_path = path[:]
     field_path.append(str(field_number))
 
-    if field_number is None or field_number not in typedef:
+    field_type = fielddef.lookup_field_type(field_key, config, field_path)
+
+    if field_type is None:
         raise EncoderException(
             "Provided field name/number %s / %s is not valid"
-            % (field_id, field_number),
+            % (field_key, field_number),
             field_path,
         )
 
-    field_typedef = typedef[field_number]
-
-    # Get encoder
-    if "type" not in field_typedef:
-        raise TypedefException(
-            "Field %s does not have a defined type." % field_number, field_path
-        )
-
-    field_type = field_typedef["type"]
-    field_order = field_typedef.get("field_order", None)
-
     field_encoder = None  # type: Callable[[Any], bytes] | None
-    if alt_field_number is not None:
-        if alt_field_number not in field_typedef["alt_typedefs"]:
-            raise EncoderException(
-                "Provided alt field name/number %s is not valid for field_number %s"
-                % (alt_field_number, field_number),
-                field_path,
-            )
-        alt_field_type = field_typedef["alt_typedefs"][alt_field_number]
-        if isinstance(alt_field_type, six.string_types):
-            # just let the field
-            field_type = alt_field_type
-        elif isinstance(alt_field_type, dict):
-            innertypedef = alt_field_type
-            field_encoder = lambda data: encode_lendelim_message(
-                data, config, innertypedef, path=field_path, field_order=field_order
-            )
-        else:
+    if isinstance(field_type, TypeDef):
+        field_typedef = field_type
+        field_type = "message"
+        field_encoder = lambda data: encode_lendelim_message(
+            data,
+            config,
+            field_typedef,
+            path=field_path,
+            field_order=fielddef.field_order,
+        )
+    else:
+        if field_type not in blackboxprotobuf.lib.types.ENCODERS:
+            raise TypedefException("Unknown type: %s" % field_type)
+        field_encoder = blackboxprotobuf.lib.types.ENCODERS[field_type]
+        if field_encoder is None:
             raise TypedefException(
-                "Provided alt field type for field %s is not valid: %s"
-                % (alt_field_number, alt_field_type),
-                field_path,
+                "Encoder not implemented for %s" % field_type, field_path
             )
-
-    if field_encoder is None:
-        if field_type == "message":
-            if "message_typedef" in field_typedef:
-                innertypedef = field_typedef["message_typedef"]
-            elif "message_type_name" in field_typedef:
-                message_type_name = field_typedef["message_type_name"]
-                if message_type_name not in config.known_types:
-                    raise TypedefException(
-                        "Message type (%s) has not been defined"
-                        % field_typedef["message_type_name"],
-                        field_path,
-                    )
-                innertypedef = config.known_types[message_type_name]
-            else:
-                raise TypedefException(
-                    "Could not find message typedef for %s" % field_number,
-                    field_path,
-                )
-
-            field_encoder = lambda data: encode_lendelim_message(
-                data, config, innertypedef, path=field_path, field_order=field_order
-            )
-        else:
-            if field_type not in blackboxprotobuf.lib.types.ENCODERS:
-                raise TypedefException("Unknown type: %s" % field_type)
-            field_encoder = blackboxprotobuf.lib.types.ENCODERS[field_type]
-            if field_encoder is None:
-                raise TypedefException(
-                    "Encoder not implemented for %s" % field_type, field_path
-                )
 
     # Encode the tag
     tag = encode_tag(
@@ -333,85 +283,134 @@ def decode_message(buf, config, typedef=None, pos=0, end=None, depth=0, path=Non
         end = len(buf)
 
     if typedef is None:
-        typedef = {}
-    else:
-        # Don't want to accidentally modify the original
-        typedef = copy.deepcopy(typedef)
+        typedef = TypeDef()
 
     if path is None:
         path = []
 
     output = {}  # type: Message
+    seen_repeated = {}  # type: Dict[str, bool]
+    mut_typedef = typedef.make_mutable()
 
     grouped_fields, field_order, pos = _group_by_number(buf, pos, end, path)
     for field_number, (wire_type, buffers) in grouped_fields.items():
         # wire_type should already be validated by _group_by_number
 
-        path = path[:] + [field_number]
-        field_outputs = None
-        field_typedef = typedef.get(field_number, {})
-        field_key = _get_field_key(field_number, typedef, path)
-        # Easy cases. Fixed size or bytes/string
-        if wire_type in [
-            wiretypes.FIXED32,
-            wiretypes.FIXED64,
-            wiretypes.VARINT,
-        ] or ("type" in field_typedef and field_typedef["type"] != "message"):
-            if "type" not in field_typedef:
-                field_typedef["type"] = config.get_default_type(wire_type)
-            else:
-                # have a type, but make sure it matches the wiretype
-                if (
-                    blackboxprotobuf.lib.types.WIRETYPES[field_typedef["type"]]
-                    != wire_type
-                ):
-                    raise DecoderException(
-                        "Type %s from typedef did not match wiretype %s for "
-                        "field %s" % (field_typedef["type"], wire_type, field_key),
-                        path=path,
-                    )
+        field_path = path[:] + [field_number]
 
-            # we already have a type, just map the decoder
-            if field_typedef["type"] not in blackboxprotobuf.lib.types.DECODERS:
-                raise TypedefException(
-                    "Got unkown type %s for field_number %s"
-                    % (field_typedef["type"], field_number),
-                    path=path,
-                )
+        fielddef_pair = mut_typedef.lookup_fielddef_number(
+            field_number
+        )  # type: Optional[Tuple[str, FieldDef]]
 
-            decoder = blackboxprotobuf.lib.types.DECODERS[field_typedef["type"]]
-            field_outputs = [decoder(buf, 0) for buf in buffers]
+        if fielddef_pair is None:
+            fielddef = FieldDef(field_number)
+        else:
+            fielddef = fielddef_pair[1]
 
-            # this shouldn't happen, but let's check just in case
-            for buf, _pos in zip(buffers, [y for _, y in field_outputs]):
-                assert len(buf) == _pos
-
-            field_outputs = [value for (value, _) in field_outputs]
-
-            # Packed decoding will return a list of lists
-            if field_typedef["type"].startswith("packed_"):
-                field_outputs = [y for x in field_outputs for y in x]
-                field_typedef[
-                    "seen_repeated"
-                ] = True  # packed fields are always repeated
-
-            # Convert to a single element if theres only 1 field and we've
-            # never seen it repeated before
-            if len(field_outputs) > 1 or field_typedef.get("seen_repeated", False):
-                output[field_key] = field_outputs
-                field_typedef["seen_repeated"] = True
-            else:
-                output[field_key] = field_outputs[0]
-
-        elif wire_type == wiretypes.LENGTH_DELIMITED:
-            _try_decode_lendelim_fields(
-                buffers, field_key, field_typedef, output, config
+        # Decode messages (which may have multiple typedefs)  or unknown length delimited fields
+        if wire_type == wiretypes.LENGTH_DELIMITED and not isinstance(
+            fielddef.lookup_field_type_number("0", config, field_path), six.string_types
+        ):
+            output_map, new_fielddef = _try_decode_lendelim_fields(
+                buffers, fielddef, config, field_path
             )
 
-        # Save the field typedef/type back to the typedef
-        typedef[field_number] = field_typedef
+            # Merge length delim field into the output map
+            for field_key, field_outputs in output_map.items():
+                output.setdefault(field_key, []).extend(field_outputs)
+            seen_repeated[fielddef.name] = new_fielddef.seen_repeated
+            mut_typedef.set_fielddef(field_number, new_fielddef)
+        else:
+            field_outputs, new_fielddef, field_alt_type_id = _decode_standard_field(
+                wire_type, buffers, fielddef, config, path
+            )
 
-    return output, typedef, field_order, pos
+            field_key = new_fielddef.field_key(field_alt_type_id)
+            output.setdefault(field_key, []).extend(field_outputs)
+            seen_repeated[fielddef.name] = new_fielddef.seen_repeated
+
+            # Save the field typedef/type back to the typedef
+            mut_typedef.set_fielddef(field_number, new_fielddef)
+
+    _simplify_output(output, seen_repeated)
+    return output, mut_typedef, field_order, pos
+
+
+def _decode_standard_field(wire_type, buffers, fielddef, config, field_path):
+    # type: (int, List[bytes], FieldDef, Config, List[str]) -> Tuple[List[Any], FieldDef, str]
+    field_outputs = None
+    field_alt_type_id = None
+    for alt_type_id, field_type in fielddef.resolve_types(config, field_path).items():
+        if isinstance(field_type, TypeDef):
+            # Skip message types
+            continue
+        if (
+            not isinstance(field_type, six.string_types)
+            or blackboxprotobuf.lib.types.WIRETYPES[field_type] != wire_type
+        ):
+            raise DecoderException(
+                "Type %s from typedef did not match wiretype %s"
+                % (field_type, wire_type),
+                path=field_path,
+            )
+
+        if field_type not in blackboxprotobuf.lib.types.DECODERS:
+            raise TypedefException(
+                "Type %s does not have a decoder" % (field_type),
+                path=field_path,
+            )
+        decoder = blackboxprotobuf.lib.types.DECODERS[field_type]
+        try:
+            field_outputs = [decoder(buf, 0)[0] for buf in buffers]
+            field_alt_type_id = alt_type_id
+        except BlackboxProtobufException as exc:
+            # Error decoding, try next one if we have one
+            continue
+        # Decoding worked
+        break
+
+    if field_outputs is None:
+        field_type = config.get_default_type(wire_type)
+        default_decoder = blackboxprotobuf.lib.types.DECODERS[field_type]
+
+        field_outputs = [default_decoder(buf, 0)[0] for buf in buffers]
+
+    mut_fielddef = fielddef.make_mutable()
+    if field_alt_type_id is None:
+        field_alt_type_id = mut_fielddef.next_alt_type_id()
+
+    mut_fielddef.set_type(field_alt_type_id, field_type)
+
+    if field_outputs is None:
+        raise DecoderException(
+            "Unable to decode wire_type %s" % (wire_type),
+            path=field_path,
+        )
+    if isinstance(field_type, six.string_types) and field_type.startswith("packed_"):
+        # Packed decoding will return a list of lists
+        field_outputs = [y for x in field_outputs for y in x]
+        mut_fielddef.mark_repeated()
+    # Mark repeated if we have have more than one
+    # Don't need to worry if it's already repeated
+    elif len(field_outputs) > 1:
+        mut_fielddef.mark_repeated()
+
+    return field_outputs, mut_fielddef, field_alt_type_id
+
+
+def _simplify_output(output, seen_repeated):
+    # type: (Message, Dict[str, bool]) -> None
+    # If any outputs only have one element, convert them from a list to solo
+    # Mutates output
+    for field_key, field_outputs in output.items():
+        if isinstance(field_outputs, list) and len(field_outputs) == 1:
+            field_name = (
+                field_key.split(six.u("-"), 1)[0]
+                if isinstance(field_key, six.string_types)
+                else six.ensure_text(str(field_key))
+            )
+            if not seen_repeated[field_name]:
+                output[field_key] = field_outputs[0]
 
 
 def _group_by_number(buf, pos, end, path):
@@ -486,33 +485,8 @@ def _group_by_number(buf, pos, end, path):
     return output_map, field_order, pos
 
 
-def _get_field_key(field_number, typedef, path):
-    # type: (str | int, TypeDef, List[str]) -> str
-    # Translate a field_number into a name if one is available in the typedef
-    if not isinstance(field_number, (int, six.string_types)):
-        raise EncoderException("Field key in message must be a str or int", path=path)
-    if isinstance(field_number, int):
-        field_number = six.ensure_text(str(field_number))
-
-    # handle an alt_typedef by transforming 1-1 to name-1
-    # I don't think should actually be used with the current uses of
-    # _get_field_key
-    alt_field_number = None
-    if "-" in field_number:
-        field_number, alt_field_number = field_number.split("-")
-
-    if field_number in typedef and typedef[field_number].get("name", "") != "":
-        field_key = typedef[field_number]["name"]
-    else:
-        field_key = field_number
-    # Return the new field_name + alt_field_number
-    return field_key + ("" if alt_field_number is None else "-" + alt_field_number)
-
-
-def _try_decode_lendelim_fields(
-    buffers, field_key, field_typedef, message_output, config
-):
-    # type: (List[bytes], str, FieldDef, Message, Config) -> None
+def _try_decode_lendelim_fields(buffers, fielddef, config, path):
+    # type: (List[bytes], FieldDef, Config, List[str]) -> Tuple[Message, FieldDef]
     # Mutates message_output
 
     # This is where things get weird
@@ -532,89 +506,90 @@ def _try_decode_lendelim_fields(
     # alternate message type definitions to also allowing downgrading to
     # 'bytes' or string with an 'alt_type' if it doesn't parse
 
+    message_output = {}  # type: Message
+
+    # TODO potential performance improvement: Do a first pass with {} or just group by number and use the results to validate if it's even valid protobuf and quick match wire_types against typedefs
     try:
         outputs_map = {}  # type: Dict[str, Any]
         field_order = []  # type: List[str]
-        # grab all dictonary alt_typedefs
-        all_typedefs = {
-            # we don't want this to modify in-place if it fails
-            key: copy.deepcopy(value)
-            for key, value in field_typedef.get("alt_typedefs", {}).items()
-            if isinstance(value, dict)
-        }  # type: Dict[str, TypeDef]
-        all_typedefs["1"] = copy.deepcopy(field_typedef.get("message_typedef", {}))
 
+        next_alt_type_id = int(fielddef.next_alt_type_id())
+        field_types = fielddef.resolve_types(config, path)
+
+        # We don't want any mutable changes within this loop, we want
+        # everything to rollback if it fails
         for buf in buffers:
             output = None
             output_typedef = None
             output_typedef_num = None
             new_field_order = []  # type: List[str]
-            for alt_typedef_num, alt_typedef in sorted(
-                all_typedefs.items(), key=lambda x: int(x[0])
+
+            for alt_type_id, field_type in sorted(
+                field_types.items(), key=lambda x: int(x[0])
             ):
+                # Skip non message types
+                if not isinstance(field_type, TypeDef):
+                    continue
+
                 try:
                     (
                         output,
                         output_typedef,
                         new_field_order,
                         _,
-                    ) = decode_lendelim_message(buf, config, alt_typedef)
-                except:
+                    ) = decode_lendelim_message(buf, config, field_type)
+                except Exception as exc:
+                    # If we get an exception, then this isn't the right typedef, try the next
                     continue
-                output_typedef_num = alt_typedef_num
+
+                output_typedef_num = alt_type_id
+                # If we didn't get an exception, then we found the right type
                 break
-            # try an anonymous type
-            # let the error propogate up if we fail this
+            # If we didn't find a type above, then try an anonymous type
+            # If this fails, we fall back to string and bytes for all types
             if output is None:
                 output, output_typedef, new_field_order, _ = decode_lendelim_message(
-                    buf, config, {}
+                    buf, config, None
                 )
-                output_typedef_num = six.ensure_text(
-                    str(max([int(i) for i in ["0"] + list(all_typedefs.keys())]) + 1)
-                )
+                output_typedef_num = six.ensure_text(str(next_alt_type_id))
+                next_alt_type_id += 1
 
             if output_typedef is None or output_typedef_num is None:
                 raise DecoderException(
                     "Could not find an output_typedef or output_typedef_num. This should not happen under any circumstances."
                 )
+
             # save the output or typedef we found
-            all_typedefs[output_typedef_num] = output_typedef
-            output_list = outputs_map.get(output_typedef_num, [])
-            output_list.append(output)
-            outputs_map[output_typedef_num] = output_list
+            field_types[output_typedef_num] = output_typedef
+            outputs_map.setdefault(output_typedef_num, []).append(output)
 
             # we should technically have a different field order for each instance of the data
             # but that would require a very messy JSON which we're trying to avoid
             if len(new_field_order) > len(field_order):
                 field_order = new_field_order
+
         # was able to decode everything as a message
-        field_typedef["type"] = "message"
-        field_typedef["message_typedef"] = all_typedefs["1"]
+        mut_fielddef = fielddef.make_mutable()
+        mut_fielddef.set_types(field_types)
 
         if config.preserve_field_order:
-            field_typedef["field_order"] = field_order
+            mut_fielddef.set_field_order(field_order)
 
-        if len(all_typedefs.keys()) > 1:
-            del all_typedefs["1"]
-            field_typedef.setdefault("alt_typedefs", {}).update(all_typedefs)
         # messages get set as "key-alt_number"
         for output_typedef_num, outputs in outputs_map.items():
-            output_field_key = field_key
-            if output_typedef_num != "1":
-                output_field_key += "-" + output_typedef_num
+            output_field_key = mut_fielddef.field_key(output_typedef_num)
 
-            if len(outputs) > 1 or field_typedef.get("seen_repeated", False):
-                message_output[output_field_key] = outputs
-                field_typedef["seen_repeated"] = True
-            else:
-                message_output[output_field_key] = outputs[0]
+            message_output[output_field_key] = outputs
+            if len(outputs) > 1:
+                mut_fielddef.mark_repeated()
+
         # success, return
-        return
+        return message_output, mut_fielddef
     except DecoderException as exc:
         # this should be pretty common, don't be noisy or throw an exception
         logging.debug(
-            "Could not decode a buffer for field number %s as a message: %s",
-            field_key,
+            "Could not decode a buffer for field (%s) as a message: %s",
+            path,
             exc,
         )
 
@@ -628,42 +603,27 @@ def _try_decode_lendelim_fields(
                 output, _ = decoder(buf, 0)
                 outputs.append(output)
 
-            # all outputs worked, this is our type
-            # check if there is a message type already in the typedef
-            if "type" in field_typedef and "message" == field_typedef["type"]:
-                # we already had a message type. save it as an alt_typedef
+            field_alt_type_id = None
+            # check if the type is already known
+            field_types = fielddef.resolve_types(config, path)
+            for alt_type_id, field_type in field_types.items():
+                if field_type == target_type:
+                    field_alt_type_id = alt_type_id
+                    break
 
-                # check if we already have this type as an alt_typedef
-                output_typedef_nums = [
-                    key
-                    for key, value in field_typedef.setdefault(
-                        "alt_typedefs", {}
-                    ).items()
-                    if value == target_type
-                ]
-                output_typedef_num = None
-                if len(output_typedef_nums) == 0:
-                    # find the next largest alt typedef number to put this type as
-                    output_typedef_num = six.ensure_text(
-                        str(
-                            max([int(i) for i in ["0"] + list(all_typedefs.keys())]) + 1
-                        )
-                    )
-                    field_typedef.setdefault("alt_typedefs", {})[
-                        output_typedef_num
-                    ] = target_type
-                else:
-                    # we already have an alt typedef with this number
-                    output_typedef_num = output_typedef_nums[0]
-                message_output[field_key + "-" + output_typedef_num] = (
-                    outputs if len(outputs) > 1 else outputs[0]
-                )
-            else:
-                field_typedef["type"] = target_type
-                message_output[field_key] = outputs if len(outputs) > 1 else outputs[0]
-            return
+            mut_fielddef = fielddef.make_mutable()
+            if field_alt_type_id is None:
+                field_alt_type_id = mut_fielddef.add_type(target_type)
+
+            field_key = mut_fielddef.field_key(field_alt_type_id)  # type: str
+
+            message_output[field_key] = outputs
+            return message_output, mut_fielddef
         except DecoderException:
             continue
+
+    # This should never happen, we should always be able to use bytes
+    raise DecoderException("Unable to decode field with typedef", path=path)
 
 
 def encode_lendelim_message(data, config, typedef, path=None, field_order=None):

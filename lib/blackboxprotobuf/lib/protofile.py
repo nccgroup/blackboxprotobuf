@@ -37,7 +37,7 @@ if six.PY3:
     if typing.TYPE_CHECKING:
         from blackboxprotobuf.lib.config import Config
         from typing import Any, TextIO, Tuple, Dict, Optional, List
-        from blackboxprotobuf.lib.pytypes import TypeDef, FieldDef
+        from blackboxprotobuf.lib.pytypes import TypeDefDict, FieldDefDict
 
 PROTO_FILE_TYPE_MAP = {
     "uint": "uint64",
@@ -95,7 +95,7 @@ for packable_type in PACKABLE_TYPES:
 
 
 def _print_message(message_name, typedef, output_file, depth=0):
-    # type: (str, TypeDef, TextIO, int) -> None
+    # type: (str, TypeDefDict, TextIO, int) -> None
     indent = six.u("  ") * depth
     if not NAME_REGEX.match(message_name):
         raise TypedefException("Message name: %s is not valid" % message_name)
@@ -170,7 +170,7 @@ def _print_message(message_name, typedef, output_file, depth=0):
 
 
 def export_proto(typedef_map, output_filename=None, output_file=None, package=None):
-    # type: (Dict[str, TypeDef], Optional[str], Optional[TextIO], Optional[str]) -> str | None
+    # type: (Dict[str, TypeDefDict], Optional[str], Optional[TextIO], Optional[str]) -> str | None
     """Export the given type definitons as a '.proto' file. Typedefs are
     expected as a dictionary of {'message_name': typedef }
 
@@ -209,8 +209,8 @@ PACKAGE_REGEX = re.compile(r"^ *package +([a-zA-Z0-9_.]+) *;.*")
 
 
 def import_proto(config, input_string=None, input_filename=None, input_file=None):
-    # type: (Config, Optional[str], Optional[str], Optional[TextIO]) -> Dict[str, TypeDef]
-    typedef_map = {}  # type: Dict[str, TypeDef]
+    # type: (Config, Optional[str], Optional[str], Optional[TextIO]) -> Dict[str, TypeDefDict]
+    typedef_map = {}  # type: Dict[str, TypeDefDict]
     if input_string is not None:
         input_file = io.StringIO(input_string)
     if input_file is None and input_filename is not None:
@@ -397,7 +397,7 @@ def _check_message_name(current_path, name, known_message_names, config):
 def _parse_message(
     message_tree, typdef_map, known_message_names, enum_names, prefix, is_proto3, config
 ):
-    # type: (Dict[str, Any], Dict[str, TypeDef], List[str], List[str], str, bool, Config) -> None
+    # type: (Dict[str, Any], Dict[str, TypeDefDict], List[str], List[str], str, bool, Config) -> None
     message_typedef = {}
     message_name = prefix + message_tree["name"]
     prefix = message_name + "."
@@ -432,8 +432,8 @@ def _parse_message(
 
 # parse a field into a dictionary for the typedef
 def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, config):
-    # type: (re.Match[str], List[str], List[str], str, bool, Config) -> Tuple[str, FieldDef]
-    typedef = {}  # type: FieldDef
+    # type: (re.Match[str], List[str], List[str], str, bool, Config) -> Tuple[str, FieldDefDict]
+    typedef = {}  # type: FieldDefDict
 
     field_name = match.group(3)
     if not field_name:

@@ -33,16 +33,16 @@ if six.PY3:
     # function that outputs any arbitrary object
     Message = Dict[str | int, Any]
 
-    TypeDef = Dict[str, "FieldDef"]
+    TypeDefDict = Dict[str, "FieldDefDict"]
 
-    FieldDef = TypedDict(
-        "FieldDef",
+    FieldDefDict = TypedDict(
+        "FieldDefDict",
         {
             "name": str,
             "type": str,
             "message_type_name": str,
-            "message_typedef": TypeDef,
-            "alt_typedefs": Dict[str, str | TypeDef],
+            "message_typedef": TypeDefDict,
+            "alt_typedefs": Dict[str, str | TypeDefDict],
             "example_value_ignored": Any,
             "seen_repeated": bool,
             "field_order": List[str],

@@ -30,7 +30,7 @@ if six.PY3:
 
     if typing.TYPE_CHECKING:
         from typing import Dict
-        from .pytypes import TypeDef
+        from .pytypes import TypeDefDict
 
 
 class Config:
@@ -38,7 +38,7 @@ class Config:
         # type: (Config) -> None
         # Map of message type names to typedefs, previously stored at
         # `blackboxprotobuf.known_messages`
-        self.known_types = {}  # type: Dict[str, TypeDef]
+        self.known_types = {}  # type: Dict[str, TypeDefDict]
 
         # Default type for "bytes" like objects that aren't messages or strings
         # Other option is currently just 'bytes_hex'

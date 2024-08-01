@@ -50,6 +50,7 @@ from blackboxprotobuf.lib.exceptions import (
     EncoderException,
     DecoderException,
 )
+from blackboxprotobuf.lib.typedef import TypeDef
 
 if six.PY3:
     import typing
@@ -57,12 +58,12 @@ if six.PY3:
     # Circular imports on Config if we don't check here
     if typing.TYPE_CHECKING:
         from typing import Dict, List, Optional
-        from blackboxprotobuf.lib.pytypes import Message, TypeDef, FieldDef
+        from blackboxprotobuf.lib.pytypes import Message, TypeDefDict, FieldDefDict
         from blackboxprotobuf.lib.config import Config
 
 
 def decode_message(buf, message_type=None, config=None):
-    # type: (bytes, Optional[str | TypeDef], Optional[Config]) -> tuple[Message, TypeDef]
+    # type: (bytes, Optional[str | TypeDefDict], Optional[Config]) -> tuple[Message, TypeDefDict]
     """Decode a protobuf message and return a python dictionary representing
     the message.
 
@@ -104,13 +105,13 @@ def decode_message(buf, message_type=None, config=None):
             "Decode message received an invalid typedef type. Typedef should be a string with a message name, a dictionary, or None"
         )
     value, typedef, _, _ = blackboxprotobuf.lib.types.length_delim.decode_message(
-        buf, config, message_type
+        buf, config, TypeDef.from_dict(message_type)
     )
-    return value, typedef
+    return value, typedef.to_dict()
 
 
 def encode_message(value, message_type, config=None):
-    # type: (Message, str | TypeDef, Optional[Config]) -> bytes
+    # type: (Message, str | TypeDefDict, Optional[Config]) -> bytes
     """Re-encode a python dictionary as a binary protobuf message.
 
     Args:
@@ -149,13 +150,13 @@ def encode_message(value, message_type, config=None):
         )
     return bytes(
         blackboxprotobuf.lib.types.length_delim.encode_message(
-            value, config, message_type
+            value, config, TypeDef.from_dict(message_type)
         )
     )
 
 
 def protobuf_to_json(buf, message_type=None, config=None):
-    # type: (bytes | list[bytes], Optional[str | TypeDef], Optional[Config]) -> tuple[str, TypeDef]
+    # type: (bytes | list[bytes], Optional[str | TypeDefDict], Optional[Config]) -> tuple[str, TypeDefDict]
     """Decode a protobuf messages and return a JSON string representing the
     messages.
 
@@ -208,7 +209,7 @@ def protobuf_to_json(buf, message_type=None, config=None):
 
 
 def protobuf_from_json(json_str, message_type, config=None):
-    # type: (str, str | TypeDef, Optional[Config]) -> bytes | list[bytes]
+    # type: (str, str | TypeDefDict, Optional[Config]) -> bytes | list[bytes]
     """Re-encode a JSON string as a binary protobuf message.
 
     Args:
@@ -256,7 +257,7 @@ def protobuf_from_json(json_str, message_type, config=None):
 
 
 def export_protofile(message_types, output_filename):
-    # type: (Dict[str, TypeDef], str) -> None
+    # type: (Dict[str, TypeDefDict], str) -> None
     """This function attempts to export a set of message type definitions to a
     `.proto` file for use with other tools.
 
@@ -273,7 +274,7 @@ def export_protofile(message_types, output_filename):
 
 
 def import_protofile(input_filename, save_to_known=True, config=None):
-    # type: (str, bool, Optional[Config]) -> Dict[str, TypeDef] | None
+    # type: (str, bool, Optional[Config]) -> Dict[str, TypeDefDict] | None
     """This function attempts to import a set of message type definitions from a
     `.proto` file.
 
@@ -310,7 +311,7 @@ NAME_REGEX = re.compile(r"\A[a-zA-Z][a-zA-Z0-9_]*\Z")
 
 
 def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
-    # type: (TypeDef, Optional[TypeDef], Optional[Config], Optional[List[str]]) -> None
+    # type: (TypeDefDict, Optional[TypeDefDict], Optional[Config], Optional[List[str]]) -> None
     """Attempt to validate a type definition object is valid.
 
     This function attempts to ensure a type definition is valid before it is
@@ -500,7 +501,7 @@ def validate_typedef(typedef, old_typedef=None, config=None, _path=None):
 
 
 def _json_safe_transform(values, typedef, toBytes, config=None):
-    # type: (Message, TypeDef, bool, Optional[Config]) -> Message
+    # type: (Message, TypeDefDict, bool, Optional[Config]) -> Message
     # Python's JSON doesn't have a default way to handle 'bytes' types. To
     # handle this, we want some string like encoding which JSON can handle but
     # can also handle arbitrary bytes. This method get's more complicated than
@@ -551,7 +552,7 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
                 % field_number
             )
 
-        field_type = typedef[field_number]["type"]  # type: str | TypeDef
+        field_type = typedef[field_number]["type"]  # type: str | TypeDefDict
         if field_type == "message":
             field_typedef = _get_typedef_for_message(typedef[field_number], config)
             if alt_number is not None:
@@ -594,7 +595,7 @@ def _json_safe_transform(values, typedef, toBytes, config=None):
 
 
 def _get_typedef_for_message(field_typedef, config):
-    # type: (FieldDef, Config) -> TypeDef
+    # type: (FieldDefDict, Config) -> TypeDefDict
     assert field_typedef["type"] == "message"
     if "message_typedef" in field_typedef:
         return field_typedef["message_typedef"]
@@ -612,7 +613,7 @@ def _get_typedef_for_message(field_typedef, config):
 
 
 def _sort_output(value, typedef, config=None):
-    # type: (Message, TypeDef, Optional[Config]) -> Message
+    # type: (Message, TypeDefDict, Optional[Config]) -> Message
     # Sort output by the field number in the typedef. Helps with readability in
     # a JSON dump
     output_dict = collections.OrderedDict()  # type: Message
@@ -695,7 +696,7 @@ def _sort_output(value, typedef, config=None):
 
 
 def sort_typedef(typedef):
-    # type: (TypeDef) -> TypeDef
+    # type: (TypeDefDict) -> TypeDefDict
     """Apply special sorting rules to the type definition to improve readability.
 
     Sorts the fields of a type definition so that important fields such as the
@@ -738,13 +739,13 @@ def sort_typedef(typedef):
         output_dict[field_number] = output_field_def
     if six.PY3 and typing.TYPE_CHECKING:
         return typing.cast(
-            TypeDef, output_dict
+            TypeDefDict, output_dict
         )  # Cast because typing doesn't like the ordered dict
     return output_dict
 
 
 def _annotate_typedef(typedef, message):
-    # type: (TypeDef, Message) -> None
+    # type: (TypeDefDict, Message) -> None
     # Add values from message into the typedef so it's easier to figure out
     # which field when you're editing manually
 
@@ -773,7 +774,7 @@ def _annotate_typedef(typedef, message):
 
 
 def _strip_typedef_annotations(typedef):
-    # type: (TypeDef) -> None
+    # type: (TypeDefDict) -> None
     # Remove example values placed by _annotate_typedef
     for _, field_def in typedef.items():
         if "example_value_ignored" in field_def:
