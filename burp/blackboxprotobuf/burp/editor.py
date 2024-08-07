@@ -593,7 +593,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 self._extension.saved_types.pop(message_info.message_hash, None)
                 self._callbacks.printError(
                     "Found unknown saved type: %s for %s"
-                    % (typename, message_info.message_hash)
+                    % (saved_type, message_info.message_hash)
                 )
         else:
             return {}, None
