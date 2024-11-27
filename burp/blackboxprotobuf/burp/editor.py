@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 import re
+import six
 import traceback
 import base64
 import zlib
