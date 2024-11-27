@@ -21,7 +21,6 @@
 import sys
 import json
 import base64
-import logging
 import argparse
 
 import typing

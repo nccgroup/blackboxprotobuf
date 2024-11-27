@@ -26,7 +26,6 @@ import sys
 import six
 import logging
 
-
 import blackboxprotobuf.lib
 from blackboxprotobuf.lib.types import varint, wiretypes
 from blackboxprotobuf.lib.exceptions import (
@@ -49,6 +48,8 @@ if six.PY3:
         from blackboxprotobuf.lib.config import Config
         from typing import Any, Callable, Dict, Tuple, Optional, List
         from blackboxprotobuf.lib.pytypes import Message
+
+logger = logging.getLogger(__name__)
 
 
 def encode_string(value):
@@ -188,7 +189,7 @@ def encode_message(data, config, typedef, path=None, field_order=None):
                     # with field naming.
                     # This might mean ordering is off from the original, but
                     # should break real protobuf messages
-                    logging.warning(
+                    logger.warning(
                         "The field_order list does not match the fields from _encode_message_field"
                     )
                     # If we're hitting a mismatch between the field order and
@@ -587,7 +588,7 @@ def _try_decode_lendelim_fields(buffers, fielddef, config, path):
         return message_output, mut_fielddef
     except DecoderException as exc:
         # this should be pretty common, don't be noisy or throw an exception
-        logging.debug(
+        logger.debug(
             "Could not decode a buffer for field (%s) as a message: %s",
             path,
             exc,
@@ -633,7 +634,6 @@ def encode_lendelim_message(data, config, typedef, path=None, field_order=None):
         data, config, typedef, path=path, field_order=field_order
     )
     length = varint.encode_varint(len(message_out))
-    logging.debug("Message length encoded: %d", len(length) + len(message_out))
     return length + message_out
 
 

@@ -39,6 +39,8 @@ if six.PY3:
         from typing import Any, TextIO, Tuple, Dict, Optional, List
         from blackboxprotobuf.lib.pytypes import TypeDefDict, FieldDefDict
 
+logger = logging.getLogger(__name__)
+
 PROTO_FILE_TYPE_MAP = {
     "uint": "uint64",
     "int": "int64",
@@ -241,7 +243,7 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
                 package_prefix = package_match.group(1) + "."
 
         elif line.startswith("import"):
-            logging.warning(
+            logger.warning(
                 "Proto file has import which is not supported "
                 "by the parser. Ensure the imported files are "
                 "processed first: %s",
@@ -266,8 +268,8 @@ def import_proto(config, input_string=None, input_filename=None, input_file=None
         enum_names += new_enum_names
         message_names += new_message_names
 
-    logging.debug("Got the following enum_names: %s", enum_names)
-    logging.debug("Got the following message_names: %s", message_names)
+    logger.debug("Got the following enum_names: %s", enum_names)
+    logger.debug("Got the following message_names: %s", message_names)
 
     for tree in message_trees:
         _parse_message(
@@ -369,23 +371,23 @@ def _check_message_name(current_path, name, known_message_names, config):
     if name in config.known_types:
         return name
     # search for anything under a common prefix in known_message_names
-    logging.debug("Testing message name: %s", name)
+    logger.debug("Testing message name: %s", name)
 
     prefix_options = [""]
     for part in current_path.split("."):
         if part:
             prefix_options = [prefix_options[0] + part + "."] + prefix_options
 
-    logging.debug("prefix_options: %s", prefix_options)
+    logger.debug("prefix_options: %s", prefix_options)
     for prefix in prefix_options:
-        logging.debug("Testing message name: %s", prefix + name)
+        logger.debug("Testing message name: %s", prefix + name)
         if prefix + name in known_message_names:
             return prefix + name
         # remove the last bit of the prefix
         if "." not in prefix:
             break
         prefix = ".".join(prefix.split(".")[:-1])
-    logging.debug(
+    logger.debug(
         "Message %s not found from %s Known names are: %s",
         name,
         current_path,
@@ -404,7 +406,6 @@ def _parse_message(
     # parse the actual message fields
     for line in message_tree["data"]:
         # lines should already be stripped and should not have messages or enums
-        # logging.debug("Line before assert: %s", line)
         assert all([not line.strip().startswith(x) for x in ["message ", "enum "]])
         # Check if the line matches the field regex
         match = FIELD_REGEX.match(line)
@@ -415,7 +416,7 @@ def _parse_message(
             message_typedef[field_number] = field_typedef
 
     # add the messsage to tyep returned typedefs
-    logging.debug("Adding message %s to typedef maps", message_name)
+    logger.debug("Adding message %s to typedef maps", message_name)
     typdef_map[message_name] = message_typedef
 
     for inner_message in message_tree["inner_messages"]:
@@ -456,7 +457,7 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
     # check normal types
     bbp_type = PROTO_FILE_TYPE_TO_BBP.get(field_type, None)
     if not bbp_type:
-        logging.debug("Got non-basic type: %s, checking enums", field_type)
+        logger.debug("Got non-basic type: %s, checking enums", field_type)
         # check enum names
         if _check_message_name(prefix, field_type, enum_names, config):
             # enum = uint
@@ -496,5 +497,5 @@ def _parse_field(match, known_message_names, enum_names, prefix, is_proto3, conf
 
     typedef["type"] = bbp_type
 
-    logging.debug("Parsed field number %s: %s", field_number, typedef)
+    logger.debug("Parsed field number %s: %s", field_number, typedef)
     return field_number, typedef
