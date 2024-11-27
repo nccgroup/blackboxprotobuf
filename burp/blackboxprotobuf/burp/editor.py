@@ -152,11 +152,13 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                 # Put the error here so that we only have one error to the user if the above encoding doesn't work
                 JOptionPane.showMessageDialog(
                     self._component,
-                    "Error encoding protobuf as-is and data to previous good state: "
+                    "Error encoding protobuf as-is. Reset data to previous good state: "
                     + str(exc),
                 )
 
                 success = True
+                # Reset the message and protobuf data both
+                self._text_editor.setText(self._last_good.message)
                 self._payload_info.protobuf_data = protobuf_data
                 return self._payload_info.generate_http(
                     self._message_info, self._helpers
@@ -168,6 +170,7 @@ class ProtoBufEditorTab(burp.IMessageEditorTab):
                     "Error encoding protobuf. Setting data to the original message. Error: "
                     + str(exc),
                 )
+                self._text_editor.setText(self._message_info.content())
                 return self._message_info.content()
 
     def _handle_protobuf(
