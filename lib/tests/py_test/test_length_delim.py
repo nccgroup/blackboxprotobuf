@@ -29,7 +29,7 @@ import binascii
 from blackboxprotobuf.lib.config import Config
 from blackboxprotobuf.lib.types import length_delim
 from blackboxprotobuf.lib.types import type_maps
-from blackboxprotobuf.lib.typedef import TypeDef
+from blackboxprotobuf.lib.typedef import TypeDef, FieldDef
 
 if six.PY2:
     string_types = (unicode, str)
@@ -506,3 +506,15 @@ def test_immutable_typedef():
 
     length_delim.decode_lendelim_message(data2, config, TypeDef.from_dict(typedef0))
     assert typedef0 == typedef0_deepcopy
+
+
+@given(x=st.binary())
+def test_bytes_fallback(x):
+    # Make sure we fallback to bytes, event if our default_binary_type fails
+    config = Config()
+    config.default_binary_type = "string"
+
+    encoded = length_delim.encode_bytes(x)
+    decoded, pos = length_delim._try_decode_lendelim_fields(
+        [encoded], FieldDef(1), config, []
+    )
