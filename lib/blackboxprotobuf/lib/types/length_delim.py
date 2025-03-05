@@ -594,9 +594,10 @@ def _try_decode_lendelim_fields(buffers, fielddef, config, path):
             exc,
         )
 
-    # Decoding as a message did not work, try strings and then bytes
-    # The bytes decoding should never fail
-    for target_type in ["string", config.default_binary_type]:
+    # Decoding as a message did not work, try strings and then the configured binary type
+    # By default, default_binary_type will be redundant with bytes, but we want
+    # to fall back on bytes if default_binary_type fails for any reason
+    for target_type in ["string", config.default_binary_type, "bytes"]:
         try:
             outputs = []
             decoder = blackboxprotobuf.lib.types.DECODERS[target_type]
