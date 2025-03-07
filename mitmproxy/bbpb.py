@@ -43,6 +43,7 @@ from blackboxprotobuf.lib.exceptions import BlackboxProtobufException
 import json
 from collections.abc import Sequence
 
+from typing import TypeVar, Callable, Optional
 
 from mitmproxy import (
     command,
@@ -54,7 +55,7 @@ from mitmproxy import (
     exceptions,
     websocket,
 )
-from mitmproxy.tools.console import overlay, signals
+from mitmproxy.tools.console import overlay, signals, keymap
 
 
 class BlackboxProtobufAddon:
@@ -149,24 +150,15 @@ class BlackboxProtobufAddon:
             message.content, typedef, self.bbpb_config
         )
 
-        edited_output = message_json
-        while True:
-            last_data = message_json
-            edited_output = ctx.master.spawn_editor(edited_output)
-            if edited_output == last_data:
-                # No changes to the message, just cancel
-                return
-            try:
-                protobuf_data = blackboxprotobuf.protobuf_from_json(
-                    edited_output, typedef_out
-                )
-                break
-            except Exception as ex:
-                logging.error(f"Error while editing typedef: {ex}")
+        def message_callback(edited_json: str) -> None:
+            protobuf_data = blackboxprotobuf.protobuf_from_json(
+                edited_json, typedef_out
+            )
+            data = payloads.encode_payload(protobuf_data, encoding_alg)
+            message.content = bytes(data)
+            self._refresh_view()
 
-        data = payloads.encode_payload(protobuf_data, encoding_alg)
-        message.content = bytes(data)
-        self._refresh_view()
+        _spawn_validating_editor(message_json, message_callback)
 
     @command.command("bbpb.edit_type")
     @command.argument("flow_part", type=types.Choice("bbpb.options.edit_type_part"))
@@ -176,32 +168,27 @@ class BlackboxProtobufAddon:
         typedef, message_hash = self._resolve_type(flow_part)
 
         typedef_json = json.dumps(typedef, indent=2)
-        edited_json = typedef_json
-        while True:
-            last_json = edited_json
-            edited_json = ctx.master.spawn_editor(edited_json)
-            if edited_json == last_json:
-                # cancelling editing
-                return
-            try:
-                new_typedef = json.loads(edited_json)
-                blackboxprotobuf.validate_typedef(new_typedef, typedef)
-                break
-            except Exception as ex:
-                logging.error(f"Error while editing typedef: {ex}")
 
-        blackboxprotobuf.lib.api._strip_typedef_annotations(new_typedef)
-        known_type = self.typedef_lookup.get(message_hash)
-        if isinstance(known_type, str):
-            # This is a named typedef, edit the known typedef instead of the saved value
-            self.bbpb_config.known_types[known_type] = new_typedef
-            self._save_project_file()
-        else:
-            # Trusting validate_typedef and not going to try to use the typedef to decode again or reencode
-            self.typedef_lookup[message_hash] = new_typedef
-            self._save_project_file()
+        def typedef_callback(typedef_json: str) -> None:
+            new_typedef = json.loads(typedef_json)
+            blackboxprotobuf.validate_typedef(
+                new_typedef, typedef
+            )  # Validate against old typedef
 
-        self._refresh_view()
+            blackboxprotobuf.lib.api._strip_typedef_annotations(new_typedef)
+            known_type = self.typedef_lookup.get(message_hash)
+            if isinstance(known_type, str):
+                # This is a named typedef, edit the known typedef instead of the saved value
+                self.bbpb_config.known_types[known_type] = new_typedef
+                self._save_project_file()
+            else:
+                # Trusting validate_typedef and not going to try to use the typedef to decode again or reencode
+                self.typedef_lookup[message_hash] = new_typedef
+                self._save_project_file()
+
+            self._refresh_view()
+
+        _spawn_validating_editor(typedef_json, typedef_callback)
 
     @command.command("bbpb.apply_type")
     @command.argument("flow_part", type=types.Choice("bbpb.options.edit_type_part"))
@@ -563,6 +550,93 @@ def _decode_protobuf(data, typedef, config, fallback=True):
     raise BlackboxProtobufException(
         'Failed to decode protobuf, but did not catch "none" decoder. This should never be hit'
     )
+
+
+# This function spawns an editor for a text file. Once the file is saved, it
+# calls `callback` with the text saved by the user. If `callback` throws an
+# exception, this function will present the error to the user and allow the
+# user to either keep editing the payload, reset the payload to the original
+# text and edit again, or give up and exit with no changes
+#
+# The UI requires that all the logic on the modified text is embedded in a
+# callback, I couldn't find any way to get a user choice without a callback
+#
+# This function is slightly cursed in that we have to use a custom chooser
+# class to allow recursive chooser calls, otherwise it only allows a single
+# prompt per command. Hopefully I can find a better way to handle this down the
+# road.
+T = TypeVar("T")
+
+
+def _spawn_validating_editor(
+    text: str, callback: Callable[[str], None], original_text: Optional[str] = None
+) -> None:
+    user_text = ctx.master.spawn_editor(text)
+    if original_text is None:
+        original_text = text
+
+    try:
+        callback(user_text)
+        signals.pop_view_state.send()
+    except Exception as exc:
+        options = ["Continue Editing", "Reset Payload And Edit", "Exit"]
+
+        def choose_callback(action: str):
+            if action == "Continue Editing":
+                # Keep editing the text that failed
+                _spawn_validating_editor(user_text, callback, original_text)
+            elif action == "Reset Payload And Edit":
+                # Edit the original text instead
+                _spawn_validating_editor(original_text, callback)
+            elif action == "Exit":
+                # Just return
+                signals.pop_view_state.send()
+                return
+            else:
+                raise Exception(
+                    f"Got unknown option in validating editor menu: {action}"
+                )
+
+        signals.pop_view_state.send()
+        ctx.master.overlay(
+            RecursiveChooser(
+                ctx.master,
+                f"Error validating payload: {exc}",
+                options,
+                "",
+                choose_callback,
+            )
+        )
+
+
+# Below is the exact keypress implementation from `overlay.Chooser`, but
+# without `signals.pop_view_state.send()` after the callbacks This allows us to
+# spawn overlays (such as another chooser) from the callback function.
+# With `overlay.Chooser`, it calls `signals.pop_view_state.send()` *after* the
+# callback, which pops off the new chooser set by the callback
+#
+# This shifts responsibility for calling `signals.pop_view_state.send()` to the
+# callback, which should call it on exit or before popping up a new chooser
+class RecursiveChooser(overlay.Chooser):
+    def keypress(self, size, key):
+        key = self.master.keymap.handle_only("chooser", key)
+        choice = self.walker.choice_by_shortcut(key)
+        if choice:
+            self.callback(choice)
+            return
+        if key == "m_select":
+            self.callback(self.choices[self.walker.index])
+            return
+        elif key in ["q", "esc"]:
+            signals.pop_view_state.send()
+            return
+
+        binding = self.master.keymap.get("global", key)
+        # This is extremely awkward. We need a better way to match nav keys only.
+        if binding and binding.command.startswith("console.nav"):
+            self.master.keymap.handle("global", key)
+        elif key in keymap.navkeys:
+            return super().keypress(size, key)
 
 
 addons = [BlackboxProtobufAddon()]
