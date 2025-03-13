@@ -31,6 +31,14 @@ This repository contains several interfaces for working with protocol buffers:
 - A python-based CLI embedded in the [library](https://github.com/nccgroup/blackboxprotobuf/tree/master/lib/CLI.md)
 - A mitmproxy addon in [mitmproxy](https://github.com/nccgroup/blackboxprotobuf/tree/master/mitmproxy)
 
+## Documentation
+
+In addition to the `README.md` for each tool, the following documentation is
+available:
+
+- [Type Definition Guide](docs/TypeDefs.md) - guide for editing typedefs to fix
+  types and improve readability
+
 ## Future Tools
 
 Some tooling that may be built on top of blackboxprotobuf in the future:
