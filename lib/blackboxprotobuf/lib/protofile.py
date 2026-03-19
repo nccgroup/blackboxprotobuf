@@ -23,7 +23,6 @@ definition format.
 # SOFTWARE.
 
 import io
-import re
 import logging
 import re
 import six
@@ -98,7 +97,7 @@ for packable_type in PACKABLE_TYPES:
 
 def _print_message(message_name, typedef, output_file, depth=0):
     # type: (str, TypeDefDict, TextIO, int) -> None
-    indent = six.u("  ") * depth
+    indent = u"  " * depth
     if not NAME_REGEX.match(message_name):
         raise TypedefException("Message name: %s is not valid" % message_name)
 
@@ -106,9 +105,9 @@ def _print_message(message_name, typedef, output_file, depth=0):
     typedef = blackboxprotobuf.lib.api.sort_typedef(typedef)
 
     message_name = message_name.strip()
-    output_file.write(six.u("\n"))
+    output_file.write(u"\n")
     output_file.write(indent)
-    output_file.write(six.u("message %s {\n") % message_name)
+    output_file.write(u"message %s {\n" % message_name)
     for field_number, field_typedef in typedef.items():
         proto_type = None
         field_name = None
@@ -157,7 +156,7 @@ def _print_message(message_name, typedef, output_file, depth=0):
 
         output_file.write(indent)
         output_file.write(
-            six.u("  %s%s %s = %s%s;\n")
+            u"  %s%s %s = %s%s;\n"
             % (
                 "repeated " if is_repeated else "",
                 proto_type,
@@ -168,7 +167,7 @@ def _print_message(message_name, typedef, output_file, depth=0):
         )
 
     output_file.write(indent)
-    output_file.write(six.u("}\n\n"))
+    output_file.write(u"}\n\n")
 
 
 def export_proto(typedef_map, output_filename=None, output_file=None, package=None):
@@ -186,9 +185,9 @@ def export_proto(typedef_map, output_filename=None, output_file=None, package=No
         output_file = io.StringIO()
 
     # preamble
-    output_file.write(six.u('syntax = "proto3";\n\n'))
+    output_file.write(u'syntax = "proto3";\n\n')
     if package:
-        output_file.write(six.u("package %s;\n\n") % package)
+        output_file.write(u"package %s;\n\n" % package)
 
     for typedef_name, typedef in typedef_map.items():
         _print_message(typedef_name, typedef, output_file)

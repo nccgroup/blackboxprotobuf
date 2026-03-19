@@ -770,7 +770,7 @@ def _annotate_typedef(typedef, message):
         # Add a blank name field if the field doesn't have one, so it's easier
         # to add
         if "name" not in field_def:
-            field_def["name"] = six.u("")
+            field_def["name"] = u""
 
 
 def _strip_typedef_annotations(typedef):
