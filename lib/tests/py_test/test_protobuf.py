@@ -46,21 +46,21 @@ except:
     import Test_pb2
 
 testMessage_typedef = {
-    "1": {"type": "double", "name": six.u("testDouble")},
-    "2": {"type": "float", "name": six.u("testFloat")},
+    "1": {"type": "double", "name": u"testDouble"},
+    "2": {"type": "float", "name": u"testFloat"},
     # "4": {"type": "int", "name": "testInt32"},
-    "8": {"type": "int", "name": six.u("testInt64")},
+    "8": {"type": "int", "name": u"testInt64"},
     # "16": {"type": "uint", "name": "testUInt32"},
-    "32": {"type": "uint", "name": six.u("testUInt64")},
+    "32": {"type": "uint", "name": u"testUInt64"},
     # "64": {"type": "sint", "name": "testSInt32"},
-    "128": {"type": "sint", "name": six.u("testSInt64")},
-    "256": {"type": "fixed32", "name": six.u("testFixed32")},
-    "512": {"type": "fixed64", "name": six.u("testFixed64")},
-    "1024": {"type": "sfixed32", "name": six.u("testSFixed32")},
-    "2048": {"type": "sfixed64", "name": six.u("testSFixed64")},
+    "128": {"type": "sint", "name": u"testSInt64"},
+    "256": {"type": "fixed32", "name": u"testFixed32"},
+    "512": {"type": "fixed64", "name": u"testFixed64"},
+    "1024": {"type": "sfixed32", "name": u"testSFixed32"},
+    "2048": {"type": "sfixed64", "name": u"testSFixed64"},
     # "4096": {"type": "int", "name": "testBool"},
-    "8192": {"type": "string", "name": six.u("testString")},
-    "16384": {"type": "bytes", "name": six.u("testBytes")},
+    "8192": {"type": "string", "name": u"testString"},
+    "16384": {"type": "bytes", "name": u"testBytes"},
     # "32768": {"type": "message", "name": "testEmbed",
     #          "message_typedef": {
     #                "3": {"type": "double", "name": "embedDouble"},
@@ -114,7 +114,7 @@ def test_modify(x, modify_num):
     hypothesis.assume(modify_key in decoded)
 
     if isinstance(decoded[modify_key], six.text_type):
-        mod_func = lambda x: six.u("test")
+        mod_func = lambda x: u"test"
     elif isinstance(decoded[modify_key], bytes):
         mod_func = lambda x: b"test"
     elif isinstance(decoded[modify_key], six.integer_types):
@@ -222,7 +222,7 @@ def test_modify_json(x, modify_num):
     hypothesis.assume(modify_key in decoded)
 
     if isinstance(decoded[modify_key], six.text_type):
-        mod_func = lambda x: six.u("test")
+        mod_func = lambda x: u"test"
     elif isinstance(decoded[modify_key], bytes):
         mod_func = lambda x: b"test"
     elif isinstance(decoded[modify_key], six.integer_types):
